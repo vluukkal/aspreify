@@ -1,11 +1,12 @@
 
-aspreify - reify answer set programming programs
+aspreify - reify answer set programs
 
 The purpose of this program is to parse textual answer set programs
-(ASP) as accepted by lparse (http://www.tcs.hut.fi/Software/smodels/)
-and produce a description of the input program as ASP facts,
-effectively reifying the input program allowing, among other things,
-ASP programs to be interpreted or modified by other ASP programs.
+(ASP, Prolog like syntax) as accepted by lparse
+(http://www.tcs.hut.fi/Software/smodels/) and produce a description of
+the input program as ASP facts, effectively reifying the input program
+allowing, among other things, ASP programs to be interpreted or
+modified by other ASP programs.
 
 Vesa Luukkala (vesa.luukkala@gmail.com), 20.10.2012 
 
@@ -19,6 +20,14 @@ A simple test:
 > ./aspreify tests/hamiltonian_cycle.lp
 produces tests/hamiltonian_cycle.lp.reified 
 
+> ./aspreify -t tests/hamiltonian_cycle.lp
+The result has the same rules, used for testing.
+tests/hamiltonian_cycle.lp.lp
+
+> ./aspreify -r tests/hamiltonian_cycle.lp
+The result is and RDF/N3-like format. 
+tests/hamiltonian_cycle.lp.ssls
+ 
 2. Limitations 
 
 2.1 Error hadling of the parser is not shown, silent death. 
