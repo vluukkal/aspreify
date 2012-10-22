@@ -2,11 +2,20 @@
 -- Main file for aspparse. 
 -- 
 -- To compile:
--- > ghc -o aspparse main.hs factrender.hs aspparse.hs 
+-- > ghc -o aspreify main.hs factrender.hs aspparse.hs 
 -- To test 
--- > ./aspparse tests/hamiltonian_cycle.lp
+-- > ./aspreify tests/hamiltonian_cycle.lp
 -- The result is 
 -- tests/hamiltonian_cycle.lp.reified 
+-- 
+-- > ./aspreify -t tests/hamiltonian_cycle.lp
+-- The result is 
+-- tests/hamiltonian_cycle.lp.lp
+-- 
+-- > ./aspreify -r tests/hamiltonian_cycle.lp
+-- The result is 
+-- tests/hamiltonian_cycle.lp.ssls
+-- 
 -- 
 -- Copyright 2012 Vesa Luukkala
 -- 

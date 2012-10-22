@@ -1,5 +1,5 @@
 
-aspparse - reify answer set programming programs
+aspreify - reify answer set programming programs
 
 The purpose of this program is to parse textual answer set programs
 (ASP) as accepted by lparse (http://www.tcs.hut.fi/Software/smodels/)
@@ -13,19 +13,21 @@ Vesa Luukkala (vesa.luukkala@gmail.com), 20.10.2012
 
 Requires Haskell platform, tested on 2012.2.0.0. 
 To produce an executable:
-> ghc -o aspparse main.hs rdfrender.hs txtrender.hs factrender.hs aspparse.hs 
+> ghc -o aspreify main.hs rdfrender.hs txtrender.hs factrender.hs aspparse.hs 
 
 A simple test:
-> ./aspparse tests/hamiltonian_cycle.lp
+> ./aspreify tests/hamiltonian_cycle.lp
 produces tests/hamiltonian_cycle.lp.reified 
 
 2. Limitations 
 
-2.1 Code for RDF rendering exists, but not accessible from commandline. 
+2.1 Error hadling of the parser is not shown, silent death. 
 
 2.2 Non-supported syntax 
 TODO 
 List here the smodels tests which do not work and why 
+
+3. Other documentation 
 
 
 
