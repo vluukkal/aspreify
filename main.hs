@@ -2,7 +2,7 @@
 -- Main file for aspparse. 
 -- 
 -- To compile:
--- > ghc -o aspreify main.hs factrender.hs aspparse.hs 
+-- > ghc -o aspreify main.hs factrender.hs rdfrender.hs txtrender.hs aspparse.hs 
 -- To test 
 -- > ./aspreify tests/hamiltonian_cycle.lp
 -- The result is 
@@ -111,14 +111,15 @@ backtolp fn1 fn2 =
     do 
       parsenrendernwrite fn1 fn2 txtrender
 
-reify fn1 fn2 =
+reify fn1 fn2 params =
     do 
-      parsenrendernwrite fn1 fn2 (factrender ("% Inputfile: " ++ fn1 ++ "\n"))
+      parsenrendernwrite fn1 fn2 (factrender ("% Inputfile: " ++ fn1 ++ "\n") params)
 
 data Flag
     = Lparse                -- -l (default)
     | Rdf                   -- -r
     | Test                  -- -t
+    | Idreuse               -- -i
     | Help                  -- --help
     deriving (Eq,Ord,Enum,Show,Bounded)
 
@@ -129,6 +130,8 @@ flags =
         "Produces reified facts in RDF/N3 compatible format."
    ,Option ['t'] []       (NoArg Test)
         "Renders the parsetree back to text, useful for testing."
+   ,Option ['i'] []       (NoArg Idreuse)
+        "Assigns the same identifier for same variable in one rule."
    ,Option []    ["help"] (NoArg Help)
         "Print this help message"
    ]
@@ -150,30 +153,42 @@ parseopts argv =
          set Test      = [Test] 
          set f      = [f] 
 
-handleafile args f = 
- case args of 
+handleafile otype other f = 
+ case otype of 
  [Rdf] -> do 
        let tmpfname = (f ++ ".tmp") 
        let outfile = (f ++ ".ssls") 
-       putStrLn ("tossls " ++ show(f) ++ " " ++ show(tmpfname) ++ " " ++ show(outfile))
+       -- putStrLn ("tossls " ++ show(f) ++ " " ++ show(tmpfname) ++ " " ++ show(outfile))
        tossls f tmpfname outfile 
  [Test] -> do
        let loopbackfile = (f ++ ".lp") 
-       putStrLn ("backtolp " ++ show(f) ++ " " ++ show(loopbackfile))
+       -- putStrLn ("backtolp " ++ show(f) ++ " " ++ show(loopbackfile))
        backtolp f loopbackfile
  _ -> do -- default is [Lparse]
       let reifiedfile = (f ++ ".reified") 
-      putStrLn ("reify " ++ show(f) ++ " " ++ show(reifiedfile))
-      reify f reifiedfile 
+      -- putStrLn ("reify " ++ show(f) ++ " " ++ show(reifiedfile))
+      let mkid = (List.elem Idreuse other)
+      reify f reifiedfile mkid
+
+-- Urgh, parseopts should be able to do this 
+-- Separate between arguments for output type
+separateargs args = 
+  List.partition onlytypes args
+  where onlytypes x | x == Rdf = True
+                    | x == Lparse = True 
+                    | x == Test = True
+                    | otherwise = False  
 
 main = 
     do 
       (args,files) <- getArgs >>= parseopts
+      let (outputtype,other) = separateargs args 
+      -- putStrLn ((show outputtype) ++ "," ++ (show other))
       -- The exclusivity must be somewhere in getopt though 
-      if length args > 1 
+      if length outputtype > 1 
       then do hPutStrLn stderr ("Only one option permitted\n" ++ (usageInfo header flags))
               exitWith (ExitFailure 1)
-      else do mapM_ (handleafile args) files 
+      else do mapM_ (handleafile outputtype other) files 
               exitWith ExitSuccess
 
       where header = "Usage: aspparse [-l|r|t] [file ...]"
