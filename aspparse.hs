@@ -628,14 +628,15 @@ body    = do (sepBy genrel (skipMany1 (space <|> char ',')))
 -- parse rule "" "initial(X) :- occurs(X), not occurs(Y) : vtx(X) : Y < X, vtx(X)."
 -- parse rule "" "r(Y) :- lc(X, Y), initial(X), arc(X, Y, L)."             
 -- parse rule "" "r(Y) :- lc(X, Y), r(X), arc(X, Y, L)."             
--- parse rule "" "denied(X,Y)."
+-- parse rule "" "denied(X,Y)." -- should not pass 
 -- parse rule "" "1 { p(X), t(X) } :- 1 {r(X), s(X), not t(X)} 2."             
 -- parse rule "" "1 { p, t } :- 1 {r, s, not t} 2."             
+-- parse rule "" "ready(A) :- \"rdf:type\"(A,\"wp1:Activity\"), not missing_commit(A)."
              
 -- rule :: GenParser Char st ((String,[String]),[(String,[String])])
 -- rule :: GenParser Char st (Body,[Body])
 rule :: GenParser Char st Rules
-rule    = do { 
+rule    = do { many space;
                n <- genrel; 
                -- n <-rel; 
                -- (skipMany1 (space <|> string ":-")); 
@@ -655,7 +656,7 @@ rule    = do {
 -- parse deny "" ":- vtx(X), occurs(X), not r(X)."
 -- deny :: GenParser Char st ((String,[String]),[(String,[String])])
 deny :: GenParser Char st Rules
-deny    = do { 
+deny    = do { many space;
                string ":-"; 
                many space;
                b <-body; 
@@ -665,7 +666,7 @@ deny    = do {
                return (Deny b) }
 
 fact :: GenParser Char st Rules
-fact    = do { 
+fact    = do { many space;
                -- setState Map.empty; -- not working 
                b <-body; 
                many space; 
@@ -679,18 +680,30 @@ fact    = do {
 -- parse rulebase "" "blub(Foo,Bar,Goo) :-  blab(Baa),\n bii.:-  zuu(Zaa),\n zii."
 -- parse rulebase "" "\n:-  zuu(Zaa),\n zii.blub(Foo,Bar,Goo) :-  blab(Baa),\n bii.\n"
 -- parse rulebase "" "p(X) :- q(X), d(X).\n"
+-- This break, probably due to the " signs, remove and it works 
+-- parse rulebase "" "ready(A) :- rdftype(A,\"wp1:Activity\"), not missing_commit(A)."
 rulebase :: GenParser Char st [Rules]
 rulebase    = many (
-                    try (many space >> rule) <|> 
-                    try(many space >> deny) <|>
-                    try(many space >> fact)
-                    <?> "Not a rule, denial or fact."                    
+                    deny <|>
+                    rule <|>
+                    try (fact) -- <|> 
+                    -- try (fact)
                    )
+{--
+rulebase    = many (
+                    try (rule) <|> 
+                    try(deny) <|>
+                    try(fact)
+                    -- <?> "Not a rule, denial or fact."                    
+                   )
+--}
 
 -- rulebase    = many rule
 
 -- parse rulebase "" "1 { maps_to(X, U) : vtx_H(U) } 1 :- vtx_G(X).\n1 { maps_to(X, U) : vtx_G(X) } 1 :- vtx_G(U).\n :- maps_to(X, U),\n        maps_to(Y, V),\n        arc_G(X, Y),\n        not arc_H(U, V),\n        vtx_H(U),\n        vtx_H(V).\n :- maps_to(X, U),\n        maps_to(Y, V),\n        not arc_G(X, Y),\n        arc_H(U, V),\n        vtx_G(X),\n        vtx_G(Y).\n"
 -- parse rulebase "" "1 { maps_to(X, U) } 1 :- vtx_G(X)."
+
+-- parse rulebase "" "ready(A) :- \"rdf:type\"(A,\"wp1:Activity\"), not missing_commit(A)."
 
 
 --constant :: GenParser Char st String
@@ -862,6 +875,7 @@ mknext' = do
 myrandIO () = 
       randomRIO (0,2^32)
 
+{--
 unfactcatom v id = 
     case v of 
       Const a -> -- show (id) ++ "). % unfactcatom Const\n" ++ 
@@ -892,4 +906,4 @@ unfactmyexpr a exprid ctr =
       Number s -> (unfactcatom s exprid)
       Arith op a1 a2 -> (unfactarith op a1 a2 exprid ctr)
 
-
+--}
