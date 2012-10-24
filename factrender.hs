@@ -27,6 +27,7 @@
 module FactRender where
 
 import qualified Data.List as List
+import qualified Data.Map as Map
 import System.IO.Unsafe
 import Data.IORef 
 
@@ -34,7 +35,7 @@ import Data.IORef
 import AspParse
 import TxtRender 
 
--- This should be temporary 
+-- This should be temporary as there is some copied code from RDF render
 import RdfRender
 
 -- An unsafe counter 
@@ -57,9 +58,15 @@ getnext :: IO Integer -> Integer
 -- getnext :: IO Int -> Int
 getnext c = System.IO.Unsafe.unsafePerformIO (c)
 
+-- Another unsafe hack to keep the variablename -> ID mapping
+-- To get rid of the we need refactoring the tree walking which produces 
+-- the output string. 
+
+varmap = unsafePerformIO $ newIORef Map.empty 
+
 --- Start here the fact rendering 
-factrender :: (Show t) => [Char] -> Either t [Rules] -> [Char]      
-factrender n rb = 
+factrender :: (Show t) => [Char] -> Bool-> Either t [Rules] -> [Char]      
+factrender n flag rb  = 
     case rb of 
       Left l -> "error:" ++ show(l)
       Right r -> 
@@ -67,7 +74,7 @@ factrender n rb =
             -- let aid = 0 in 
             let ctr = FactRender.unsafectr in 
             let aid = FactRender.getnext(ctr::IO Integer) in 
-              n ++ (List.foldr (factitem aid ctr) "" r)
+              n ++ (List.foldr (factitem aid ctr) "" (reverse r))
 
 txtcomment t = 
   let l = lines t in 
@@ -76,6 +83,8 @@ txtcomment t =
   let newl = List.map (\t -> "% " ++ t ) l in 
   unlines newl
 
+-- This one will have its own "namespace", that is it may be 
+-- that variables with same lexical name should have same ID. 
 -- factitem :: Show a => a -> IO Int -> Rules -> [Char] -> [Char]
 factitem :: Show a => a -> IO Integer -> Rules -> [Char] -> [Char]
 factitem id ctr i accu =
@@ -106,6 +115,9 @@ factitem id ctr i accu =
                 (List.foldr (++) "" (List.foldr (factbody "head" ruleid ctr) [] l))
                 -- ++ 
                 -- ""
+      Show l -> accu 
+      Hide l -> accu 
+
 -- factcard :: [Char] -> Int -> IO Int -> Body -> [[Char]] -> [[Char]]
 factcard :: [Char] -> Integer -> IO Integer -> Body -> [[Char]] -> [[Char]]
 factcard rel parentid ctr r accu = 
@@ -297,3 +309,33 @@ typeargs parentid ctr a =
                        
               in
                 (new_ac,(previd + 1))
+
+unfactcatom v id = 
+    case v of 
+      Const a -> -- show (id) ++ "). % unfactcatom Const\n" ++ 
+                 "cnst(" ++ show(id) ++ "," ++ show(a) ++ ").\n"
+      Var a -> -- show (id) ++ "). % unfactcatom Var \n" ++ -- "cvar
+               "var(" ++ show(id) ++ "," ++ show(a) ++ ").\n"
+
+unfactarith op a1 a2 exprid ctr = 
+    -- let lid = (myrand())::Int in
+    -- let rid = (myrand())::Int in
+    let lid = FactRender.getnext(ctr) in
+    let rid = FactRender.getnext(ctr) in
+    -- show(exprid) ++ "). % X1\n" ++ 
+    "arithexpr(" ++ show (exprid) ++ ").\n" ++ 
+    "op(" ++ show (exprid) ++ "," ++ "\"" ++ (unop op)  ++ "\"" ++ ")." ++ 
+    -- show (exprid) ++ ",rdf:type,http://m3.org/rls#arithexpr\n" ++ 
+    -- show (exprid) ++ ",http://m3.org/rls#op,\"" ++ (unop op) ++ "\"\n" ++ 
+    -- Perhaps we should have the order here explicitely rather than just lines?
+    -- The same mechanism as tlist could work here 
+    -- "arg(" ++ show(exprid) ++ "," ++ (unfactmyexpr a1 lid ctr) ++ "). % Y2\n" ++ 
+    -- "arg(" ++ show(exprid) ++ "," ++ (unfactmyexpr a2 rid ctr) ++ "). % Y1\n" 
+    "larg(" ++ show(exprid) ++ "," ++ show(lid) ++ ")." ++ (unfactmyexpr a1 lid ctr) ++ 
+    "rarg(" ++ show(exprid) ++ "," ++ show(rid) ++ ")." ++ (unfactmyexpr a2 rid ctr) 
+
+unfactmyexpr a exprid ctr = 
+    case a of 
+      Sym s -> (unfactcatom s exprid)
+      Number s -> (unfactcatom s exprid)
+      Arith op a1 a2 -> (unfactarith op a1 a2 exprid ctr)

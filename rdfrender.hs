@@ -260,13 +260,15 @@ rdfitem id i accu =
                 (List.foldr (++) "" (List.foldr (rdfbody' "http://m3.org/rls#hasbody" ruleid) [] l))
                 ++ 
                 ""
+      Show l -> accu 
+      Hide l -> accu 
 
 rdfrender rb = 
     case rb of 
       Left l -> "error:" ++ show(l)
       Right r -> 
           let aid = (myrand())::Int in 
-          List.foldr (rdfitem aid) "" r
+          List.foldr (rdfitem aid) "" (reverse r)
       -- Right r -> show(r)
 
 rdfrulerender n rb = 

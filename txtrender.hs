@@ -91,15 +91,21 @@ txtbody' r accu =
 txtitem i accu =
     case i of
       Rule b l -> accu ++ head(txtbody' b []) ++ " :- \n\t " ++ 
-                  unwords(List.intersperse ",\n\t" (List.foldr txtbody' [] (reverse l))) ++ 
+                  unwords(List.intersperse ",\n\t" (List.foldr txtbody' [] (l))) ++ 
                  ".\n\n"
       Deny l -> accu  ++ ":- \n\t " ++ 
-                unwords(List.intersperse ",\n\t" (List.foldr txtbody' [] (reverse l))) ++ ".\n\n"
+                unwords(List.intersperse ",\n\t" (List.foldr txtbody' [] (l))) ++ ".\n\n"
       Fact l -> accu  ++ 
-                unwords(List.intersperse ",\n\t" (List.foldr txtbody' [] (reverse l))) ++ ".\n\n"
+                unwords(List.intersperse ",\n\t" (List.foldr txtbody' [] (l))) ++ ".\n\n"
+      Hide l -> accu ++ unwords(List.intersperse ",\n" 
+                                (List.foldr (\x a -> ("hide " ++ x):a) [] 
+                                 (List.foldr txtbody' [] (l)))) ++ ".\n\n"
+      Show l -> accu ++ unwords(List.intersperse ",\n" 
+                                (List.foldr (\x a -> ("show " ++ x):a) [] 
+                                 (List.foldr txtbody' [] (l)))) ++ ".\n\n"
 
 
 txtrender rb = 
     case rb of 
       Left l -> "error:" ++ show(l)
-      Right r -> List.foldr txtitem "" r
+      Right r -> List.foldr txtitem "" (reverse r)
