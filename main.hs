@@ -186,7 +186,7 @@ main =
       -- putStrLn ((show outputtype) ++ "," ++ (show other))
       -- The exclusivity must be somewhere in getopt though 
       if length outputtype > 1 
-      then do hPutStrLn stderr ("Only one option permitted\n" ++ (usageInfo header flags))
+      then do hPutStrLn stderr ("Only one output type permitted\n" ++ (usageInfo header flags))
               exitWith (ExitFailure 1)
       else do mapM_ (handleafile outputtype other) files 
               exitWith ExitSuccess
