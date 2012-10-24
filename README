@@ -30,7 +30,8 @@ tests/hamiltonian_cycle.lp.ssls
  
 2. Limitations 
 
-2.1 Error hadling of the parser is not shown, silent death. 
+2.1 Error handling is rudimentary, syntax errors are reported, but often
+    indicated to be after the actual error. 
 
 2.2 Non-supported syntax 
 TODO 
@@ -38,5 +39,8 @@ List here the smodels tests which do not work and why
 
 3. Other documentation 
 
+TODO
+
+#EOF
 
 
