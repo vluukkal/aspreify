@@ -737,29 +737,36 @@ showorhide    =
 
 -- parse rulebase "" "ready(A :- \"rdf:type\"(A,\"wp1:Activity\"), not missing_commit(A)." -- should fail
 -- parse rulebase "" "ready(A) :- \"rdf:type\" A,\"wp1:Activity\"), not missing_commit(A)." -- should fail
+-- parse rulebase "" "k { in(X) : vtx(X) }.\n:- in(X), in(Y), not arc(X, Y), vtx(X), vtx(Y).\n"
 
 rulebase :: GenParser Char st [Rules]
 rulebase = (sepEndBy (threerule) spaces) -- this actually works with the hamiltonian!
                                          -- but not with test3.lp. 
 -- rulebase = manyTill threerule eof
-{--
+{-- --
 -- This was the previous rulebase which swallowed 
 -- all errors. 
 -- The skipMany space seem to be needed...
-rulebase'    = many (
+rulebase    = many (
                     try ((skipMany space) >> deny) <|>
                     try ((skipMany space) >> rule) <|>
                     try ((skipMany space) >> fact) -- <|> 
                     -- try (fact) 
                    ) <?> "Not a rule, denial or fact."
---}
+-- --}
+
+-- parse ruleorfact "" "k { in(X) : vtx(X) }.\n"
+-- parse ruleorfact "" "a(X,Y) :- in(X), in(Y), not arc(X, Y), vtx(X), vtx(Y).\n"
+ruleorfact = try(rule) <|> 
+             fact
 
 threerule = do {
             skipMany space;
             showorhide <|>
             deny <|>
-            rule <|>
-            fact 
+            ruleorfact 
+            -- rule <|>
+            -- fact -- <|>
             <?> "rule, denial or fact, ugh"}
  
 

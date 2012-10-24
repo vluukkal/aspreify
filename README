@@ -12,7 +12,7 @@ Vesa Luukkala (vesa.luukkala@gmail.com), 20.10.2012
 
 1. Building 
 
-Requires Haskell platform, tested on 2012.2.0.0. 
+Requires Haskell platform (http://www.haskell.org/platform/), tested on 2012.2.0.0. 
 To produce an executable:
 > ghc -o aspreify main.hs rdfrender.hs txtrender.hs factrender.hs aspparse.hs 
 
@@ -21,7 +21,7 @@ A simple test:
 produces tests/hamiltonian_cycle.lp.reified 
 
 > ./aspreify -t tests/hamiltonian_cycle.lp
-The result has the same rules, used for testing.
+The result has the same unreified rules as the input, used for testing.
 tests/hamiltonian_cycle.lp.lp
 
 > ./aspreify -r tests/hamiltonian_cycle.lp
@@ -30,16 +30,47 @@ tests/hamiltonian_cycle.lp.ssls
  
 2. Limitations 
 
-2.1 Error handling is rudimentary, syntax errors are reported, but often
-    indicated to be after the actual error. 
+2.1 Error handling 
+
+Error handling is rudimentary, syntax errors are reported, but often
+indicated to be after the actual error. Errors are not signaled with the
+return values, but the result file contains the syntax error.
 
 2.2 Non-supported syntax 
-TODO 
-List here the smodels tests which do not work and why 
 
-3. Other documentation 
+The ASP weight constraints, aka the statements inside [ ] are 
+not handled properly, if at all. 
+The ; syntax for multiple facts is not supported (e.g. person(a; b; c).)
+Some character encodings will break the parsing, like ä or ö. 
+
+In the lparse release there are many examples in the examples/ 
+directory. Here we list those that are known not to work with
+aspreify and the cause for it. 
+
+examples/graph/
+longest_cycle.lp		use of weight constraints
+traveling_salesman.lp		use of weight constraints
+
+examples/logic/
+All OK
+
+examples/planning/
+logistics.lp			a single ä in prefix comment 
+				and something unknown at this point
+
+examples/puzzles/
+All of these have an ä in the comments to start with, remove that
+and change person( ork; bog ) to person(ork). person(bog). to make
+this work. 
+
+puzzle1.lp			person(a; b; c).
+puzzle2.lp			person( ork; bog ).
+puzzle3.lp			person(a; b).
+
+3. Other documentation 		
 
 TODO
+- List the produced factnames and the docuemntation for them
 
 #EOF
 
