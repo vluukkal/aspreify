@@ -108,16 +108,26 @@ data MyExpr = Number Atom
 
 
 -- To test this:
--- parse variable "" "Foo"
--- parse variable "" "F"
--- parse variable "" "X > Y"
--- variable :: GenParser Char st String
-variable :: GenParser Char st Atom
-variable   = do{ c  <- upper
+-- parse nvariable "" "Foo"
+-- parse nvariable "" "F"
+-- parse nvariable "" "X > Y"
+nvariable :: GenParser Char st Atom
+nvariable   = do{ c  <- upper
                 ; cs <- option "" (many (noneOf "\n\r\t (){[]},.=:"))
                 ; skipMany space
                 ; return (Var (c:cs))
                 }
+
+anyvar :: GenParser Char st Atom
+anyvar      = do {
+              string "_";
+              return(Var "_")}
+
+variable :: GenParser Char st Atom
+variable   = anyvar <|>
+             nvariable 
+
+
 
 -- parse atomsimple "" "m" -- expects lowercase 
 -- parse atomsimple "" "blah"
@@ -164,12 +174,20 @@ atomquoted   = do {
 -- atom :: GenParser Char st String
 atom :: GenParser Char st Atom 
 atom  = 
+    atomquoted <|>
+    atomsimple
+    <?> "a fact starting with lowercase or quoted string"
+{--
+atom  = 
     try(atomsimple) <|>
     try(atomquoted) 
     <?> "a fact starting with lowercase or quoted string"
+--}
+
 
 -- parse myelem "" "Foo"
 -- parse myelem "" "foo"
+-- parse myelem "" "_"
 -- parse myelem "" "foo,Bar,goo" -- only gives the first foo
 -- parse myelem "" "\"foo\""
 -- myelem :: GenParser Char st String
@@ -177,10 +195,16 @@ atom  =
 -- myelem = choice [atom, variable]
 
 myelem :: GenParser Char st MyExpr
--- myelem = do { res <- choice [constant, atom, variable]; return res}
+-- myelem = do { res <- choice [numericexpr,atom, variable]; return res}
 myelem = 
-    try(numericexpr) <?>
+       try(numericexpr) <?>
        "A numeric expression inside a fact"
+
+{--
+myelem = 
+       try(numericexpr) <?>
+       "A numeric expression inside a fact"
+--}
 
 --myelem' :: GenParser Char st MyExpr
 --myelem' = choice [atom, variable]
@@ -197,6 +221,8 @@ myelem =
 -- parse args "" " ( Foo,Bar )" -- this will die,  XXX 
                                 -- because of last space in front of )
 -- parse args "" "(1 .. k)"
+-- parse args "" "(foo,Bar,5)"
+-- parse args "" "(foo,\"Bar\",5)"
 -- args :: GenParser Char st [String]
 -- args :: GenParser Char st [Atom]
 args :: GenParser Char st [MyExpr]
@@ -230,6 +256,8 @@ data Body = Plain Atom [MyExpr] Bool
 data Rules = Rule Body [Body]
            | Deny [Body]
            | Fact [Body]
+           | Show [Body]
+           | Hide [Body]
             deriving (Show)
 
 -- an aggregate to contain negrel, wrel and srel from below
@@ -538,7 +566,8 @@ numeric    =
     -- try(nexpr) <|>
     try(do { v <- variable; return (Sym v) }) <|>
     try(do { v <- atomsimple; return (Sym v) }) <|>
-    try(do { n <- anumber; return (Number n) })
+    try(do { n <- anumber; return (Number n) }) <|>
+    try(do { n <- atomquoted; return (Sym n) })
     <?> "A variable, atom or number"
 
 
@@ -562,6 +591,7 @@ atomm    = do { r <- atom; return (r,[])}
 -- Generic rel, fact or relation
 -- parse genrel "" "blub"
 -- parse genrel "" "blub(Foo,Bar,Goo)"
+-- parse genrel "" "waitingfor(_,_)"
 -- parse genrel "" "X > Y" -- NOK 20.3 
 -- parse genrel "" "{blub(Foo,Bar,Goo)}"
 -- parse genrel "" "{blub(Foo,Bar,Goo),blab(Zub,Zap,Zoo)}"
@@ -570,21 +600,10 @@ atomm    = do { r <- atom; return (r,[])}
 -- parse genrel "" "{  sat(C) : clause(C) } 1" 
 -- parse genrel "" "{  sat(C) : clause(C) } k-1"
 -- parse genrel "" "{ true(A) : atom(A) }" 
--- Fail on 9.11.2011
--- parse genrel "" "2{i(A,\"wp1:active\",\"yes\"),d(A,\"wp1:active\",\"no\")}2" --- NOK
--- Left (line 1, column 1):
--- unexpected "2"
--- expecting relation, choice or simple atom
-
--- Fail on 9.11.2011
--- parse genrel "" "M{\"wp1:commits\"(Cap,A3):\"rdf:type\"(A3,\"wp1:Activity\")}" --- NOK
--- Left (line 1, column 1):
--- unexpected "M"
--- expecting relation, choice or simple atom
-
--- parse genrel "" "{i(A,\"wp1:active\",\"yes\"),d(A,\"wp1:active\",\"no\")}2" --- NOK
--- parse genrel "" "{blub(Foo,\"Bar\",Goo)}" --- NOK
--- It is the \",s that kill it!
+-- parse genrel "" "2{i(A,\"wp1:active\",\"yes\"),d(A,\"wp1:active\",\"no\")}2"
+-- parse genrel "" "M{\"wp1:commits\"(Cap,A3):\"rdf:type\"(A3,\"wp1:Activity\")}"
+-- parse genrel "" "{i(A,\"wp1:active\",\"yes\"),d(A,\"wp1:active\",\"no\")}2"
+-- parse genrel "" "{blub(Foo,\"Bar\",Goo)}"
 -- parse genrel "" "[ lc(X, Y) : arc(X, Y, L) = L ]" 
 -- parse genrel "" "not occurs(Y) : Y < X, vtx(X)" -- vtx should not be parsed 
 
@@ -614,6 +633,7 @@ genrel    =
 -- parse body "" "occurs(X), not occurs(Y) : Y < X, vtx(X)" -- Up until ':'
 -- parse body "" "not occurs(Y) : Y < X, vtx(X)" 
 -- parse body "" "occurs(X), not occurs(Y) : vtx(X) : Y < X, vtx(X)" 
+-- parse body "" "waitingfor(_,_)."
 -- body :: GenParser Char st [(String,[String])]
 body :: GenParser Char st [Body]
 body    = do (sepBy genrel (skipMany1 (space <|> char ',')))
@@ -632,19 +652,25 @@ body    = do (sepBy genrel (skipMany1 (space <|> char ',')))
 -- parse rule "" "1 { p(X), t(X) } :- 1 {r(X), s(X), not t(X)} 2."             
 -- parse rule "" "1 { p, t } :- 1 {r, s, not t} 2."             
 -- parse rule "" "ready(A) :- \"rdf:type\"(A,\"wp1:Activity\"), not missing_commit(A)."
+
+-- parse rule "" "ready(A :- \"rdf:type\"(A,\"wp1:Activity\"), not missing_commit(A)." -- should fail
+-- parse rule "" "ready(A) :- \"rdf:type\" A,\"wp1:Activity\"), not missing_commit(A)." -- should fail
              
 -- rule :: GenParser Char st ((String,[String]),[(String,[String])])
 -- rule :: GenParser Char st (Body,[Body])
-rule :: GenParser Char st Rules
-rule    = do { many space;
+rule :: GenParser Char st Rules    
+rule    = do { 
                n <- genrel; 
                -- n <-rel; 
                -- (skipMany1 (space <|> string ":-")); 
-               many space;
+               -- many space;
+               skipMany space;
                string ":-"; 
-               many space;
+               -- many space;
+               skipMany space;
                b <-body; 
-               many space; 
+               -- many space; 
+               skipMany space; 
                char '.';
                return (Rule n b) }
 
@@ -656,22 +682,46 @@ rule    = do { many space;
 -- parse deny "" ":- vtx(X), occurs(X), not r(X)."
 -- deny :: GenParser Char st ((String,[String]),[(String,[String])])
 deny :: GenParser Char st Rules
-deny    = do { many space;
+deny    = do { 
                string ":-"; 
-               many space;
+               skipMany space;
                b <-body; 
-               many space; 
+               skipMany space; 
                char '.';
                -- return (("",[]),b) }
                return (Deny b) }
 
+-- parse fact "" "waitingfor(_,_)."
+-- parse fact "" "waitingfor(X,Y)."
 fact :: GenParser Char st Rules
-fact    = do { many space;
+fact    = do { 
                -- setState Map.empty; -- not working 
-               b <-body; 
-               many space; 
+               b <- body; 
+               skipMany space; 
                char '.';
                return (Fact b) }
+
+showf :: GenParser Char st Rules
+showf    = do { 
+               string "show";
+               skipMany1 space; 
+               Fact f <- fact;
+               return (Show f) }
+
+hidef :: GenParser Char st Rules
+hidef    = do { 
+               string "hide";
+               skipMany1 space; 
+               Fact f <- fact;
+               return (Hide f) }
+
+-- parse showorhide "" "show waitingfor(_,_)."
+
+showorhide :: GenParser Char st Rules
+showorhide    = 
+              try(showf) <|> 
+              try(hidef)
+
 
 -- parse rulebase "" ":-  blab(Baa),\n bii."
 -- parse rulebase "" "{ true(A) : atom(A) }."
@@ -680,23 +730,38 @@ fact    = do { many space;
 -- parse rulebase "" "blub(Foo,Bar,Goo) :-  blab(Baa),\n bii.:-  zuu(Zaa),\n zii."
 -- parse rulebase "" "\n:-  zuu(Zaa),\n zii.blub(Foo,Bar,Goo) :-  blab(Baa),\n bii.\n"
 -- parse rulebase "" "p(X) :- q(X), d(X).\n"
--- This break, probably due to the " signs, remove and it works 
 -- parse rulebase "" "ready(A) :- rdftype(A,\"wp1:Activity\"), not missing_commit(A)."
+-- parse rulebase "" "ready(A) :- rdftype(A,\"wp1:Activity\"), not missing_commit(A).\n\nmissing_commit(A) :- \n    \"rdf:type\"(A,\"wp1:Activity\"),\n    \"wp1:uses\"(A,Cap),\n    not \"wp1:commits\"(Cap,A).\n " 
+-- parse rulebase "" "show deadlock(_).\nshow conflict(_,_,_).\nshow banish(_)."
+-- parse rulebase "" "ready(A) :- rdftype(A,\"wp1:Activity\"), not missing_commit(A).\n\nmissing_commit(A) :- \n    \"rdf:type\"(A,\"wp1:Activity\"),\n    \"wp1:uses\"(A,Cap),\n    not \"wp1:commits\"(Cap,A).\nshow deadlock(_).\nshow conflict(_,_,_).\nshow banish(_)." 
+
+-- parse rulebase "" "ready(A :- \"rdf:type\"(A,\"wp1:Activity\"), not missing_commit(A)." -- should fail
+-- parse rulebase "" "ready(A) :- \"rdf:type\" A,\"wp1:Activity\"), not missing_commit(A)." -- should fail
+
 rulebase :: GenParser Char st [Rules]
-rulebase    = many (
-                    deny <|>
-                    rule <|>
-                    try (fact) -- <|> 
-                    -- try (fact)
-                   )
+rulebase = (sepEndBy (threerule) spaces) -- this actually works with the hamiltonian!
+                                         -- but not with test3.lp. 
+-- rulebase = manyTill threerule eof
 {--
-rulebase    = many (
-                    try (rule) <|> 
-                    try(deny) <|>
-                    try(fact)
-                    -- <?> "Not a rule, denial or fact."                    
-                   )
+-- This was the previous rulebase which swallowed 
+-- all errors. 
+-- The skipMany space seem to be needed...
+rulebase'    = many (
+                    try ((skipMany space) >> deny) <|>
+                    try ((skipMany space) >> rule) <|>
+                    try ((skipMany space) >> fact) -- <|> 
+                    -- try (fact) 
+                   ) <?> "Not a rule, denial or fact."
 --}
+
+threerule = do {
+            skipMany space;
+            showorhide <|>
+            deny <|>
+            rule <|>
+            fact 
+            <?> "rule, denial or fact, ugh"}
+ 
 
 -- rulebase    = many rule
 
@@ -874,36 +939,3 @@ mknext' = do
 
 myrandIO () = 
       randomRIO (0,2^32)
-
-{--
-unfactcatom v id = 
-    case v of 
-      Const a -> -- show (id) ++ "). % unfactcatom Const\n" ++ 
-                 "cnst(" ++ show(id) ++ "," ++ show(a) ++ ").\n"
-      Var a -> -- show (id) ++ "). % unfactcatom Var \n" ++ -- "cvar
-               "var(" ++ show(id) ++ "," ++ show(a) ++ ").\n"
-
-unfactarith op a1 a2 exprid ctr = 
-    -- let lid = (myrand())::Int in
-    -- let rid = (myrand())::Int in
-    let lid = getnext(ctr) in
-    let rid = getnext(ctr) in
-    -- show(exprid) ++ "). % X1\n" ++ 
-    "arithexpr(" ++ show (exprid) ++ ").\n" ++ 
-    "op(" ++ show (exprid) ++ "," ++ "\"" ++ (unop op)  ++ "\"" ++ ")." ++ 
-    -- show (exprid) ++ ",rdf:type,http://m3.org/rls#arithexpr\n" ++ 
-    -- show (exprid) ++ ",http://m3.org/rls#op,\"" ++ (unop op) ++ "\"\n" ++ 
-    -- Perhaps we should have the order here explicitely rather than just lines?
-    -- The same mechanism as tlist could work here 
-    -- "arg(" ++ show(exprid) ++ "," ++ (unfactmyexpr a1 lid ctr) ++ "). % Y2\n" ++ 
-    -- "arg(" ++ show(exprid) ++ "," ++ (unfactmyexpr a2 rid ctr) ++ "). % Y1\n" 
-    "larg(" ++ show(exprid) ++ "," ++ show(lid) ++ ")." ++ (unfactmyexpr a1 lid ctr) ++ 
-    "rarg(" ++ show(exprid) ++ "," ++ show(rid) ++ ")." ++ (unfactmyexpr a2 rid ctr) 
-
-unfactmyexpr a exprid ctr = 
-    case a of 
-      Sym s -> (unfactcatom s exprid)
-      Number s -> (unfactcatom s exprid)
-      Arith op a1 a2 -> (unfactarith op a1 a2 exprid ctr)
-
---}
