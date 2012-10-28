@@ -56,13 +56,11 @@ examples/logic/
 All OK
 
 examples/planning/
-logistics.lp			a single ä in prefix comment 
-				use of const 
+logistics.lp			use of const 
 				use of != instead of neq(_,_)
 
 examples/puzzles/
-All of these have an ä in the comments to start with, remove that
-and change person( ork; bog ) to person(ork). person(bog). to make
+Change person( ork; bog ) to person(ork). person(bog). to make
 this work. 
 
 puzzle1.lp			person(a; b; c).
@@ -72,7 +70,9 @@ puzzle3.lp			person(a; b).
 3. Other documentation 		
 
 TODO
-- List the produced factnames and the docuemntation for them
+- List the produced factnames and the documentation for them
+- add directives of the lparse language
+- add support for the gringo input language 
 
 #EOF
 
