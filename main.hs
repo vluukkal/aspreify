@@ -44,7 +44,13 @@ import System.Directory (removeFile)
 
 import qualified Data.List as List
 import Text.ParserCombinators.Parsec
+
 import System.IO
+import Data.Text
+import Data.Text.IO
+import qualified Data.Text.Encoding as E
+import qualified Data.Text.Encoding.Error as Err
+import qualified Data.ByteString as B
 
 import System.Console.GetOpt
 import System.Exit
@@ -60,22 +66,23 @@ import RdfRender
 parsenrender :: String -> ((Either ParseError [Rules]) -> String) -> IO String
 parsenrender fname renderer = 
     do {
-      istr <- readFile fname; 
-      let tree = parse rulebase "" istr in 
+      -- istr <- Data.Text.IO.readFile fname; 
+      istr <- B.readFile fname; 
+      let tree = parse rulebase "" (unpack (E.decodeUtf8With Err.lenientDecode istr)) in 
       let output = renderer tree in 
       return (show output)
     }
 
 removecomm :: String -> String 
 removecomm s = 
-  unlines (reverse(List.foldl precomment [] (lines s)))
+  List.unlines (List.reverse(List.foldl precomment [] (List.lines s)))
   where 
     precomment accu l = 
       if l == ""
-      then accu 
+      then "\n":accu 
       else
         case List.elemIndex '%' l of
-          Just idx -> (take idx l):accu
+          Just idx -> (List.take idx l):accu
           Nothing -> l:accu 
 
 -- parsenrendernwrite "test2.lp" "mooh.lp" txtrender
@@ -84,13 +91,14 @@ removecomm s =
 -- parsenrendernwrite "maxsat.lp" "mooh.lp" txtrender
 parsenrendernwrite fname fname2 renderer = 
     do 
-      istr <- readFile fname
+      -- istr <- Data.Text.IO.readFile fname
+      istr <- B.readFile fname
       -- let tree = parse rulebase "" istr 
       -- let output = renderer tree 
-      let ppstr = removecomm istr -- an ugly hack to remove the comments before parsing 
-      let output = renderer (parse rulebase "" ppstr )
+      let ppstr = removecomm (unpack (E.decodeUtf8With Err.lenientDecode istr)) -- an ugly hack to remove the comments before parsing 
+      let output = pack(renderer (parse rulebase "" ppstr ))
       outh <- openFile fname2 WriteMode
-      hPutStr outh output 
+      Data.Text.IO.hPutStr outh output 
       hClose outh
 
 -- tossls "test4.lp" "mooh4.lp" "mooh4.ssls"
@@ -104,8 +112,9 @@ tossls fn1 fn2 fn3 =
 
       -- Now read in the text and construct the 
       -- the ssls string. 
-      inpstr <- readFile fn2 
-      writeFile fn3 (prefix ++ (unlines(List.map ((++) lineprefix) (lines inpstr))) ++ postfix)
+      -- inpstr <- Data.Text.IO.readFile fn2 
+      inpstr <- B.readFile fn2 
+      Data.Text.IO.writeFile fn3 (pack (prefix ++ (List.unlines(List.map ((++) lineprefix) (List.lines (unpack (E.decodeUtf8With Err.lenientDecode inpstr))))) ++ postfix))
     
 backtolp fn1 fn2 =
     do 
@@ -139,13 +148,13 @@ flags =
 parseopts argv = 
    case getOpt Permute flags argv of
    (args,fs,[]) -> do
-        let files = if null fs then ["-"] else fs
+        let files = if List.null fs then ["-"] else fs
         if Help `elem` args
-            then do hPutStrLn stderr (usageInfo header flags)
+            then do System.IO.hPutStrLn stderr (usageInfo header flags)
                     exitWith ExitSuccess
-            else return (List.nub (concatMap set args), files)
+            else return (List.nub (List.concatMap set args), files)
    (_,_,errs)      -> do
-        hPutStrLn stderr (concat errs ++ usageInfo header flags)
+        System.IO.hPutStrLn stderr (List.concat errs ++ usageInfo header flags)
         exitWith (ExitFailure 1)
    where header = "Usage: aspparse [-l|r|t] [file ...]"
          set Lparse      = [Lparse] 
@@ -185,8 +194,8 @@ main =
       let (outputtype,other) = separateargs args 
       -- putStrLn ((show outputtype) ++ "," ++ (show other))
       -- The exclusivity must be somewhere in getopt though 
-      if length outputtype > 1 
-      then do hPutStrLn stderr ("Only one output type permitted\n" ++ (usageInfo header flags))
+      if List.length outputtype > 1 
+      then do System.IO.hPutStrLn stderr ("Only one output type permitted\n" ++ (usageInfo header flags))
               exitWith (ExitFailure 1)
       else do mapM_ (handleafile outputtype other) files 
               exitWith ExitSuccess

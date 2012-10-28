@@ -25,7 +25,9 @@
 
 module TxtRender where
 
-import qualified Data.List as List
+import qualified Data.List as L
+import Data.Text
+
 -- import System.IO.Unsafe
 -- import Data.IORef 
 
@@ -33,11 +35,10 @@ import qualified Data.List as List
 import AspParse
 
 txtargs a = 
-    if length a == 0 
+    if L.length a == 0 
     then ""
     else 
---        "(" ++ unwords(intersperse "," (map unatom a))  ++ ")"
-        "(" ++ unwords(List.intersperse "," (List.map unmyexpr a))  ++ ")"
+        "(" ++ L.unwords(L.intersperse "," (L.map unmyexpr a))  ++ ")"
         
 -- 'r' is a single Rule
 -- 'nl' is a flag whether to add an nl 
@@ -70,19 +71,19 @@ txtbody' r accu =
                              [(if min == (Sym (Const "any")) then "" else (unmyexpr(min) ++ " ")) ++ 
                              "{" ++ 
                               -- (head(txtbody' b [])) ++ 
-                              unwords((List.intersperse "," (List.foldr txtbody' [] b))) ++ 
+                              L.unwords((L.intersperse "," (L.foldr txtbody' [] b))) ++ 
                               "}" ++
                             (if max == (Sym (Const "any")) then "" else (" " ++ unmyexpr(max)))]
     Count min max b nonneg -> accu ++ 
                              [(if min == (Sym (Const "any")) then "" else (unmyexpr(min) ++ " ")) ++ 
                              "[" ++ 
                               -- (head(txtbody' b [])) ++ 
-                              unwords((List.intersperse "," (List.foldr txtbody' [] b))) ++ 
+                              L.unwords((L.intersperse "," (L.foldr txtbody' [] b))) ++ 
                               "]" ++
                             (if max == (Sym (Const "any")) then "" else (" " ++ unmyexpr(max)))]
     Typed bl -> accu ++
-                [unwords((List.intersperse " : " (List.foldr txtbody' [] (reverse bl) )))]
-    Weighed e1 b1 -> accu ++ [(head(txtbody' b1 [])) ++ " = " ++ 
+                [L.unwords((L.intersperse " : " (L.foldr txtbody' [] (L.reverse bl) )))]
+    Weighed e1 b1 -> accu ++ [(L.head(txtbody' b1 [])) ++ " = " ++ 
                    (unmyexpr e1) ]
     BExpr op b1 b2 -> accu ++ [(unmyexpr b1) ++ " " ++ (unbop op) ++ " " ++ 
                    (unmyexpr b2)]
@@ -90,22 +91,22 @@ txtbody' r accu =
 
 txtitem i accu =
     case i of
-      Rule b l -> accu ++ head(txtbody' b []) ++ " :- \n\t " ++ 
-                  unwords(List.intersperse ",\n\t" (List.foldr txtbody' [] (l))) ++ 
+      Rule b l -> accu ++ L.head(txtbody' b []) ++ " :- \n\t " ++ 
+                  L.unwords(L.intersperse ",\n\t" (L.foldr txtbody' [] (l))) ++ 
                  ".\n\n"
       Deny l -> accu  ++ ":- \n\t " ++ 
-                unwords(List.intersperse ",\n\t" (List.foldr txtbody' [] (l))) ++ ".\n\n"
+                L.unwords(L.intersperse ",\n\t" (L.foldr txtbody' [] (l))) ++ ".\n\n"
       Fact l -> accu  ++ 
-                unwords(List.intersperse ",\n\t" (List.foldr txtbody' [] (l))) ++ ".\n\n"
-      Hide l -> accu ++ unwords(List.intersperse ",\n" 
-                                (List.foldr (\x a -> ("hide " ++ x):a) [] 
-                                 (List.foldr txtbody' [] (l)))) ++ ".\n\n"
-      Show l -> accu ++ unwords(List.intersperse ",\n" 
-                                (List.foldr (\x a -> ("show " ++ x):a) [] 
-                                 (List.foldr txtbody' [] (l)))) ++ ".\n\n"
+                L.unwords(L.intersperse ",\n\t" (L.foldr txtbody' [] (l))) ++ ".\n\n"
+      Hide l -> accu ++ L.unwords(L.intersperse ",\n" 
+                                (L.foldr (\x a -> ("hide " ++ x):a) [] 
+                                 (L.foldr txtbody' [] (l)))) ++ ".\n\n"
+      Show l -> accu ++ L.unwords(L.intersperse ",\n" 
+                                (L.foldr (\x a -> ("show " ++ x):a) [] 
+                                 (L.foldr txtbody' [] (l)))) ++ ".\n\n"
 
 
 txtrender rb = 
     case rb of 
       Left l -> "error:" ++ show(l)
-      Right r -> List.foldr txtitem "" (reverse r)
+      Right r -> L.foldr txtitem "" (L.reverse r)

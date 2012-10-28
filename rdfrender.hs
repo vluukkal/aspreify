@@ -25,7 +25,7 @@
 
 module RdfRender where
 
-import qualified Data.List as List
+import qualified Data.List as L
 import System.IO.Unsafe
 import Data.IORef 
 
@@ -78,7 +78,7 @@ rdfargs parentid a =
     else 
         -- let (res,ids) = foldr alist ("",parentid) a in res
         -- let (res,ids) = foldl alist ("",parentid) (reverse a) in res
-        let (res,ids) = List.foldl alist ("",parentid) a in res
+        let (res,ids) = L.foldl alist ("",parentid) a in res
         -- let (res,ids) = foldl alist ("",parentid) (map unatom a) in res
         -- show(a)
     where 
@@ -159,8 +159,8 @@ rdfbody' rel parentid r accu =
                          else (show(factid) ++ 
                                        ",http://m3.org/rls#negated,\"yes\"\n")) ++ 
                         -- head(rdfbody' "" factid b []) ++ XXX
-                        (List.foldr (++) "" 
-                         (List.foldr 
+                        (L.foldr (++) "" 
+                         (L.foldr 
                           (rdfbody' "http://m3.org/rls#hasbody" factid) [] b)) ++                         -- show("moo") ++ 
                         (let minexprid = (myrand())::Int in 
                          if min == (Sym (Const "any")) then "" else 
@@ -187,8 +187,8 @@ rdfbody' rel parentid r accu =
                          else (show(factid) ++ 
                                        ",http://m3.org/rls#negated,\"yes\"\n")) ++ 
                         -- head(rdfbody' "" factid b []) ++ XXX
-                        (List.foldr (++) "" 
-                         (List.foldr 
+                        (L.foldr (++) "" 
+                         (L.foldr 
                           (rdfbody' "http://m3.org/rls#hasbody" factid) [] b)) ++                         -- show("moo") ++ 
                         (let minexprid = (myrand())::Int in 
                          if min == (Sym (Const "any")) then "" else 
@@ -212,8 +212,8 @@ rdfbody' rel parentid r accu =
                      show(factid) ++ ",rdf:type,http://m3.org/rls#qual\n" ++
                      -- show(parentid) ++ ",rdf:type,http://m3.org/rls#qual\n" ++
                      show(factid) ++ ",owl:subClassof,http://m3.org/rls#stmt\n" ++
-                     (List.foldr (++) ""
-                      (List.foldr
+                     (L.foldr (++) ""
+                      (L.foldr
                        (rdfbody' "http://m3.org/rls#hastype" factid) [] b
                       ))]
     Weighed e1 b1 -> let wid = (myrand())::Int in
@@ -250,14 +250,14 @@ rdfitem id i accu =
     case i of
       Rule b l -> accu ++ preflink ++ show(ruleid) ++ ",rdf:type,http://m3.org/rls#rule\n" ++
            head(rdfbody' "" ruleid b []) ++ 
-                  (List.foldr (++) "" (List.foldr (rdfbody' "http://m3.org/rls#hasbody" ruleid) [] l)) ++ 
+                  (L.foldr (++) "" (L.foldr (rdfbody' "http://m3.org/rls#hasbody" ruleid) [] l)) ++ 
                  "" 
       Deny l -> accu ++ preflink ++ show(ruleid) ++ ",rdf:type,http://m3.org/rls#constraint\n" ++
-                (List.foldr (++) "" (List.foldr (rdfbody' "http://m3.org/rls#hasbody" ruleid) [] l))
+                (L.foldr (++) "" (L.foldr (rdfbody' "http://m3.org/rls#hasbody" ruleid) [] l))
                 ++ 
                 ""
       Fact l -> accu ++ preflink ++ show(ruleid) ++ ",rdf:type,http://m3.org/rls#assertion\n" ++
-                (List.foldr (++) "" (List.foldr (rdfbody' "http://m3.org/rls#hasbody" ruleid) [] l))
+                (L.foldr (++) "" (L.foldr (rdfbody' "http://m3.org/rls#hasbody" ruleid) [] l))
                 ++ 
                 ""
       Show l -> accu 
@@ -268,7 +268,7 @@ rdfrender rb =
       Left l -> "error:" ++ show(l)
       Right r -> 
           let aid = (myrand())::Int in 
-          List.foldr (rdfitem aid) "" (reverse r)
+          L.foldr (rdfitem aid) "" (reverse r)
       -- Right r -> show(r)
 
 rdfrulerender n rb = 
@@ -277,4 +277,4 @@ rdfrulerender n rb =
                    show(fileid) ++ ",http://m3.org/rls#name," ++ show(n) ++ "\n" in 
     case rb of 
       Left l -> "error:" ++ show(l)
-      Right r -> filepref ++ (List.foldr (rdfitem fileid) "" r)
+      Right r -> filepref ++ (L.foldr (rdfitem fileid) "" r)
