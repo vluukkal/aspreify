@@ -87,6 +87,7 @@ txtbody' r accu =
                    (unmyexpr e1) ]
     BExpr op b1 b2 -> accu ++ [(unmyexpr b1) ++ " " ++ (unbop op) ++ " " ++ 
                    (unmyexpr b2)]
+    Assign nm e -> accu ++ [(unatom nm) ++ " = " ++ (unmyexpr e)]
     Empty -> accu ++ [" NONE "]
 
 txtitem i accu =
@@ -103,6 +104,9 @@ txtitem i accu =
                                  (L.foldr txtbody' [] (l)))) ++ ".\n\n"
       Show l -> accu ++ L.unwords(L.intersperse ",\n" 
                                 (L.foldr (\x a -> ("show " ++ x):a) [] 
+                                 (L.foldr txtbody' [] (l)))) ++ ".\n\n"
+      Consts l -> accu ++ L.unwords(L.intersperse ",\n" 
+                                (L.foldr (\x a -> ("const " ++ x):a) [] 
                                  (L.foldr txtbody' [] (l)))) ++ ".\n\n"
 
 

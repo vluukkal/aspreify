@@ -96,6 +96,7 @@ factitem id ctr i accu =
     let ruleid = FactRender.getnext(ctr)::Integer in 
     -- let preflink = show(id) ++ ",http://m3.org/rls#partof," ++ show(ruleid) ++ "\n" in 
     let preflink = "hasrule(" ++ show(id) ++ "," ++ show(ruleid) ++ ").\n" in 
+    let cnstlink = "hasconst(" ++ show(id) ++ "," ++ show(ruleid) ++ ").\n" in 
     let ctext = txtcomment(txtitem i "") in 
     case i of
       Rule b l -> 
@@ -117,6 +118,9 @@ factitem id ctr i accu =
                 -- ""
       Show l -> accu 
       Hide l -> accu 
+      Consts l -> accu ++ ctext ++ cnstlink ++ 
+                  "constdef(" ++ show(ruleid) ++ ")." ++ "\n" ++
+                  (List.foldr (++) "" (List.foldr (factbody "" ruleid ctr) [] l))
 
 -- factcard :: [Char] -> Int -> IO Int -> Body -> [[Char]] -> [[Char]]
 factcard :: [Char] -> Integer -> IO Integer -> Body -> [[Char]] -> [[Char]]
@@ -262,7 +266,17 @@ factbody rel parentid ctr r accu =
               --- show (factid) ++ ",http://m3.org/rls#bop,\"" ++ (unbop op) ++ "\"\n" ++ 
               --- show (factid) ++ ",http://m3.org/rls#left," ++ (unrdfmyexpr b1 lid ) ++ 
               --- show (factid) ++ ",http://m3.org/rls#right," ++ (unrdfmyexpr b2 rid )]
-
+    Assign nm e -> 
+           let nid = FactRender.getnext(ctr) in
+           let eid = FactRender.getnext(ctr) in
+           accu ++ 
+           [
+           -- "constdef(" ++ show(factid) ++ ").\n" ++ 
+           "constn(" ++ show(parentid) ++ "," ++ show(nid) ++ ").\n" ++ 
+           "constval(" ++ show(parentid) ++ "," ++ show(eid) ++ ").\n" ++ 
+           (unfactcatom nm nid) ++ 
+           (unfactmyexpr e eid ctr)
+           ]
     Empty -> accu ++ [" NONE "]
 
 factargs parentid a ctr = 

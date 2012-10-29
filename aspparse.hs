@@ -98,6 +98,7 @@ data BOp = Gt
           | GtEq
           | LtEq
           | Eq 
+          | Neq
           | Eqeq
             deriving(Show,Eq)
 
@@ -250,6 +251,7 @@ data Body = Plain Atom [MyExpr] Bool
           | Typed [Body]
           | Weighed MyExpr Body
           | BExpr BOp MyExpr MyExpr 
+          | Assign Atom MyExpr
           | Empty 
             deriving (Show,Eq)
 
@@ -258,6 +260,7 @@ data Rules = Rule Body [Body]
            | Fact [Body]
            | Show [Body]
            | Hide [Body]
+           | Consts [Body]
             deriving (Show)
 
 -- an aggregate to contain negrel, wrel and srel from below
@@ -332,6 +335,8 @@ posatomrel    = do {n <- atom
 negatomrel :: GenParser Char st Body
 negatomrel    = do {string "not"; many space; n <- atom
             ;return (Plain n [] False)}
+
+-- constrel = do {c <- constdef; return }
 
 -- typed relation 
 -- parse trel "" "arc_S(X, Y) : arc(X, Y)"
@@ -508,6 +513,7 @@ mybop    =
     try(do {c <- char '='; return Eq}) <|>
     try(do {s <- string "<="; return LtEq}) <|> 
     try(do {s <- string ">="; return GtEq}) <|> 
+    try(do {s <- string "!="; return Neq}) <|> 
     try(do {s <- string "=="; return Eqeq}) 
            <?> "Expected a comparison operation: >,<,<=,>=,=,=="
 
@@ -716,6 +722,18 @@ hidef    = do {
                Fact f <- fact;
                return (Hide f) }
 
+-- parse constdef "" "const k = 10."
+constdef :: GenParser Char st Rules
+constdef    = do { 
+               string "const";
+               skipMany1 space; 
+               nm <- atom;
+               string "="; 
+               skipMany1 space; 
+               e <- numericexpr;
+               char '.'; 
+               return (Consts [(Assign nm e)]) }
+
 -- parse showorhide "" "show waitingfor(_,_)."
 
 showorhide :: GenParser Char st Rules
@@ -739,6 +757,8 @@ showorhide    =
 -- parse rulebase "" "ready(A :- \"rdf:type\"(A,\"wp1:Activity\"), not missing_commit(A)." -- should fail
 -- parse rulebase "" "ready(A) :- \"rdf:type\" A,\"wp1:Activity\"), not missing_commit(A)." -- should fail
 -- parse rulebase "" "k { in(X) : vtx(X) }.\n:- in(X), in(Y), not arc(X, Y), vtx(X), vtx(Y).\n"
+-- parse rulebase "" "const k = 10."
+
 
 rulebase :: GenParser Char st [Rules]
 rulebase = (sepEndBy (threerule) spaces) -- this actually works with the hamiltonian!
@@ -763,9 +783,10 @@ ruleorfact = try(rule) <|>
 
 threerule = do {
             skipMany space;
-            showorhide <|>
-            deny <|>
-            ruleorfact 
+            try(showorhide) <|> -- the following have fixed keywords in the beginning
+            try(constdef) <|>   -- that's why we can try them 
+            deny <|>     -- here we estart with the generic ones, if they all are tried
+            ruleorfact   -- the error messages are suppressed 
             -- rule <|>
             -- fact -- <|>
             <?> "rule, denial or fact, ugh"}
@@ -879,6 +900,7 @@ unbop op =
       GtEq -> ">="
       LtEq -> "<="
       Eq -> "="
+      Neq -> "!="
       Eqeq -> "=="
 
 unarith op a1 a2 = 

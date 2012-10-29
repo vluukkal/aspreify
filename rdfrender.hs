@@ -240,7 +240,13 @@ rdfbody' rel parentid r accu =
               show (factid) ++ ",http://m3.org/rls#bop,\"" ++ (unbop op) ++ "\"\n" ++ 
               show (factid) ++ ",http://m3.org/rls#left," ++ (unrdfmyexpr b1 lid ) ++ 
               show (factid) ++ ",http://m3.org/rls#right," ++ (unrdfmyexpr b2 rid )]
-
+    Assign nm e -> 
+           let nid = (myrand())::Int in
+           let eid = (myrand())::Int in
+            [show (factid) ++ "\n" ++ 
+             -- show (factid) ++ ",rdf:type,http://m3.org/rls#bexpr\n" ++ 
+             show (factid) ++ ",http://m3.org/rls#constnm," ++ (unrdfcatom nm nid) ++ 
+             show (factid) ++ ",http://m3.org/rls#constval," ++ (unrdfmyexpr e eid )]
     Empty -> accu ++ [" NONE "]
 
 rdfitem id i accu =
@@ -262,6 +268,9 @@ rdfitem id i accu =
                 ""
       Show l -> accu 
       Hide l -> accu 
+      Consts l -> accu ++ preflink ++ show(ruleid) ++ ",rdf:type,http://m3.org/rls#constdef\n" ++
+                 (L.foldr (++) "" (L.foldr (rdfbody' "http://m3.org/rls#hasbody" ruleid) [] l))
+
 
 rdfrender rb = 
     case rb of 
