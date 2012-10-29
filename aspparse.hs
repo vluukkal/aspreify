@@ -196,19 +196,11 @@ atom  =
 -- myelem = choice [atom, variable]
 
 myelem :: GenParser Char st MyExpr
+myelem = 
+       try(numericexpr) <?>
+       "A numeric expression inside a fact"
+
 -- myelem = do { res <- choice [numericexpr,atom, variable]; return res}
-myelem = 
-       try(numericexpr) <?>
-       "A numeric expression inside a fact"
-
-{--
-myelem = 
-       try(numericexpr) <?>
-       "A numeric expression inside a fact"
---}
-
---myelem' :: GenParser Char st MyExpr
---myelem' = choice [atom, variable]
 
 
 -- parse args "" "(Foo, Bar, Goo)"
@@ -238,16 +230,9 @@ args    = do { words <- between (skipMany1 (space <|> char '(' <|> space ))
                         ; return words}
 
 
---                (Name,[Args],Not_negated)
--- data Body = Plain String [String] Bool
--- data Body = Plain Atom [Atom] Bool
 data Body = Plain Atom [MyExpr] Bool
---               (Min,Max,Plain, Type, Not_negated)
---               Should be Plain inside, though
-          -- | Card Atom Atom [Body] Bool
           | Card MyExpr MyExpr [Body] Bool
           | Count MyExpr MyExpr [Body] Bool
-          -- | Typed Body Body -- 26.3. 
           | Typed [Body]
           | Weighed MyExpr Body
           | BExpr BOp MyExpr MyExpr 
@@ -278,7 +263,6 @@ arel    =
 -- parse negrel "" "not blub(Foo,Bar,Goo)"
 negrel :: GenParser Char st Body
 negrel    = do {
-            -- skipMany1 (space);
             string "not"; 
             skipMany1 (space)
             ;n <- atom; many space;
@@ -316,7 +300,6 @@ wrel    = do {
 srel :: GenParser Char st Body
 srel    = do {n <- atom; many space;
             ;myargs <- args
---            ;return (n,myargs)}
             ;return (Plain n myargs True)}
 
 -- parse atomrel "" "blub(Foo,Bar,Goo)"
@@ -336,8 +319,6 @@ negatomrel :: GenParser Char st Body
 negatomrel    = do {string "not"; many space; n <- atom
             ;return (Plain n [] False)}
 
--- constrel = do {c <- constdef; return }
-
 -- typed relation 
 -- parse trel "" "arc_S(X, Y) : arc(X, Y)"
 -- parse trel "" "not arc_S(X, Y) : arc(X, Yo)"
@@ -347,10 +328,7 @@ negatomrel    = do {string "not"; many space; n <- atom
 -- parse trel "" "f : vtx(Y) : Y < X."
 trel :: GenParser Char st Body
 trel    = do {one <- arel;
-                     -- skipMany1 (space <|> char ':' <|> space ); 
               skipMany1 (space <|> justcolon <|> space ); 
-              -- two <- arel;
-              -- rest <- (sepBy arel (skipMany1 (space <|> char ':')));              
               rest <- (sepBy arel (skipMany1 (space <|> justcolon)));              
               -- the above forces that there is at least        
               -- two entries for the list of types.       
@@ -443,7 +421,6 @@ mychoice    = do { low <- option (Sym (Const "any")) numericexpr; -- aggregateco
 --                         return content}
                    high <- option (Sym (Const "any")) numericexpr; -- aggregateconst;
                          return (Card low high content True)}
-                         -- return (Card "any" "any" content content2 True)}
 
 mychoiceold :: GenParser Char st Body
 mychoiceold    = do { low <- option (Sym (Const "any")) numericexpr; -- aggregateconst;
@@ -479,7 +456,6 @@ mycount    = do { low <- option (Sym (Const "any")) numericexpr; -- aggregatecon
 --                         return content}
                    high <- option (Sym (Const "any")) numericexpr; -- aggregateconst;
                          return (Count low high content True)}
-                         -- return (Card "any" "any" content content2 True)}
 
 
 
@@ -621,10 +597,6 @@ genrel    =
             try(mycount) <|>
             try(rel) <|> 
             try(bexpr) <|> -- X > Y 
-            -- try(mycard1) <|>
-            -- try(mycard2) <|>
-            -- try(mycard3) <|>
-            -- try(mychoice) <|>
             -- This is endlessly ugly, and may be the reason 
             -- we fail silently. 
             -- It is to detect a single atom and wrap 
@@ -670,13 +642,10 @@ rule    = do {
                n <- genrel; 
                -- n <-rel; 
                -- (skipMany1 (space <|> string ":-")); 
-               -- many space;
                skipMany space;
                string ":-"; 
-               -- many space;
                skipMany space;
                b <-body; 
-               -- many space; 
                skipMany space; 
                char '.';
                return (Rule n b) }
@@ -778,6 +747,9 @@ rulebase    = many (
 
 -- parse ruleorfact "" "k { in(X) : vtx(X) }.\n"
 -- parse ruleorfact "" "a(X,Y) :- in(X), in(Y), not arc(X, Y), vtx(X), vtx(Y).\n"
+-- We have to factor this out; these two are 
+-- really similar and only after trying to match a rule
+-- we know whether it was a fact after all. 
 ruleorfact = try(rule) <|> 
              fact
 
@@ -787,8 +759,6 @@ threerule = do {
             try(constdef) <|>   -- that's why we can try them 
             deny <|>     -- here we estart with the generic ones, if they all are tried
             ruleorfact   -- the error messages are suppressed 
-            -- rule <|>
-            -- fact -- <|>
             <?> "rule, denial or fact, ugh"}
  
 
@@ -800,33 +770,16 @@ threerule = do {
 -- parse rulebase "" "ready(A) :- \"rdf:type\"(A,\"wp1:Activity\"), not missing_commit(A)."
 
 
---constant :: GenParser Char st String
---constant   = many (noneOf "\n\r\t ()")
-       
--- parse tok "" "Foo"
--- parse tok "" "foo"
---tok :: GenParser Char st String
--- tok = choice [atom, variable]
-
--- parse atom "" "foo"
--- parse atom "" "foo(X,Y)"
-
-
 -- rule = header >> string ":-" >> body
--- atom = endBy char '.'
-
--- constant = many (noneOf "\n\r\t ()")
--- variable = many (noneOf "\n\r\t ()")
--- eol = char '\n'
 
 -- The actual call to the parser is in 
 -- parse rulebase "" istr 
 
 -- But if we want to have user state, here an empty map, 
 -- we need 
+-- runParser rulebase Map.empty "" istr 
 -- Note that the "" is the filename that is used for error
 -- messages, may be empty as here. 
--- runParser rulebase Map.empty "" istr 
 
 -- For some reason I cant make this 
 -- to return the result without using 
