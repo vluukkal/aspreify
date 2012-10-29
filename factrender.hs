@@ -140,6 +140,20 @@ factcard' rel parentid ctr r (accu, previd) =
    in (newaccu, (previd+1))
    --   in newaccu 
 
+--- A wrapper around factbody, keeping track of the 
+--- items in a typed or qualified list. 
+-- factcard' :: [Char] -> Int -> IO Int -> Body -> ([[Char]], Int) -> ([[Char]], Int)
+factcount :: [Char] -> Integer -> IO Integer -> Body -> ([[Char]], Int) -> ([[Char]], Int)
+factcount rel parentid ctr r (accu, previd) = 
+   let nxt = 0 in 
+   --- let newaccu = (accu ++ ["tlist(" ++ show(parentid) ++ "," ++ show(previd) ++ "," ++ show(nxt) ++ ").\n" ] ++ (factbody "type" parentid ctr r accu)) 
+   -- let newaccu = (accu ++ (factbody "typed" parentid ctr r accu)) 
+   -- let newaccu = (accu ++ (factbody rel parentid ctr r accu)) 
+   let newaccu = (factbody rel parentid ctr r accu)
+   -- let newaccu = tmp ++ ["tlist'(" ++ show(parentid) ++ "," ++ show(previd) ++ "," ++ show(nxt) ++ ").\n" ] 
+   in (newaccu, (previd+1))
+   --   in newaccu 
+
 
 -- factbody :: [Char] -> Int -> IO Int -> Body -> [[Char]] -> [[Char]]
 factbody :: [Char] -> Integer -> IO Integer -> Body -> [[Char]] -> [[Char]]
@@ -164,8 +178,7 @@ factbody rel parentid ctr r accu =
     Card min max b nonneg -> let myrel = (if rel == "" then "head" else rel)
                         in 
                           accu ++ --- ["YYYCard\n"] ++ 
-                       [(if nonneg then "" 
-                         else "not ") ++ 
+                       [(if nonneg then "" else "not ") ++ 
                          myrel ++ "(" ++ show(parentid) ++ "," ++ show(factid) ++ ").\n" ++
                          "card(" ++ show(factid) ++ ").\n" ++ 
                         (List.foldr (++) "" 
@@ -183,35 +196,26 @@ factbody rel parentid ctr r accu =
                              "maxcard(" ++ show(factid) ++ "," ++  show(maxexprid) ++ ").\n" ++ 
                                        (unfactmyexpr max maxexprid ctr))
                        ]
-    Count min max b nonneg -> let myrel = (if rel == "" then "http://m3.org/rls#hashead" else rel)
+    Count min max b nonneg -> let myrel = (if rel == "" then "head" else rel)
                         in 
-                          accu ++ ["YYYCount\n"] ++ 
-                       [show(parentid) ++ "," ++ myrel ++ "," ++ 
-                        show(factid) ++ "\n" ++
-                        show(factid) ++ ",rdf:type,http://m3.org/rls#count\n" ++
-                        show(factid) ++ ",owl:subClassof,http://m3.org/rls#stmt\n" ++
-                        (if nonneg then "" 
-                         else (show(factid) ++ 
-                                       ",http://m3.org/rls#negated,\"yes\"\n")) ++ 
-                        -- head(rdfbody' "" factid b []) ++ XXX
+                          accu ++ -- ["YYYCount\n"] ++ 
+                       [(if nonneg then "" else "not ") ++ 
+                         myrel ++ "(" ++ show(parentid) ++ "," ++ show(factid) ++ ").\n" ++
+                         "weigh(" ++ show(factid) ++ ").\n" ++ 
                         (List.foldr (++) "" 
-                         (List.foldr 
-                          (rdfbody' "http://m3.org/rls#hasbody" (fromInteger factid)) [] b)) ++                         -- show("moo") ++ 
+                         -- (let content = (foldr (factbody "body" factid ctr) [] b) in content)) ++
+                         (let (content,localid) = (List.foldr (factcard' "body" factid ctr) ([],0) b) in content)) 
+                        ++ 
                         (-- let minexprid = (myrand())::Int in 
-                          let minexprid = FactRender.getnext(ctr) in 
+                         let minexprid = FactRender.getnext(ctr) in  
                          if min == (Sym (Const "any")) then "" else 
-                             show(factid) ++ 
-                                       ",http://m3.org/rls#min," ++ 
-                                       -- show(unrdfmyexpr min minexprid) ++ 
-                                       (unrdfmyexpr min (fromInteger minexprid))) ++
-                                     -- "\n") ++
+                             "mincount(" ++ show(factid) ++ "," ++ show(minexprid) ++ ").\n" ++ 
+                                       (unfactmyexpr min minexprid ctr)) ++
                         (-- let maxexprid = (myrand())::Int in 
-                          let maxexprid = FactRender.getnext(ctr) in 
+                          let maxexprid = FactRender.getnext(ctr) in  
                          if max == (Sym (Const "any")) then "" else 
-                             show(factid) ++ 
-                                       ",http://m3.org/rls#max," ++ 
-                                       -- show(unrdfmyexpr max maxexprid) ++ 
-                                       (unrdfmyexpr max (fromInteger maxexprid)))
+                             "maxcount(" ++ show(factid) ++ "," ++  show(maxexprid) ++ ").\n" ++ 
+                                       (unfactmyexpr max maxexprid ctr))
                        ]
     Typed b -> let myrel = (if rel == "" then "head" else rel)
                         in 
@@ -232,19 +236,17 @@ factbody rel parentid ctr r accu =
                      -- let eid = (myrand())::Int in
                      let wid = FactRender.getnext(ctr) in
                      let eid = FactRender.getnext(ctr) in
-                     let myrel = (if rel == "" then "http://m3.org/rls#hashead" else rel)
+                     let myrel = (if rel == "" then "head" else rel)
                      in 
-                     -- we reuse same factid essentially producing an rdfexpr
-                     -- with added property #weight with its own ID
-                     accu ++ ["YYYWeighed\n"] ++ 
-                     [show(parentid) ++ "," ++ myrel ++ "," ++ 
-                      show(factid) ++ "\n" ++
-                      show(factid) ++ ",rdf:type,http://m3.org/rls#weighedstmt\n" ++
-                     -- show(parentid) ++ ",rdf:type,http://m3.org/rls#qual\n" ++
-                      show(factid) ++ ",owl:subClassof,http://m3.org/rls#stmt\n" ++
-                     -- (head(rdfbody' "http://m3.org/rls#weighed" eid b1 [])) ++  
-                     (head(rdfbody' "http://m3.org/rls#weighed" (fromInteger factid) b1 [])) ++  
-                     show (factid) ++ ",http://m3.org/rls#weight," ++ (unrdfmyexpr e1 (fromInteger wid)) -- ++ "\n" 
+                     accu ++ -- ["YYYWeighed\n"] ++ 
+                     [myrel ++ "(" ++ show(parentid) ++ "," ++ show(factid) ++ ").\n" ++
+                        (List.foldr (++) "" 
+                         -- (let (content,localid) = (List.foldr (factcount "body" factid ctr) ([],0) b1) in content)) 
+                         (let (content,localid) = (List.foldr (factcount "body" factid ctr) ([],0) [b1]) in content)) 
+                        ++ 
+                        (if e1 == (Sym (Const "any")) then "" else 
+                             "weight(" ++ show(factid) ++ "," ++ show(eid) ++ ").\n" ++ 
+                                       (unfactmyexpr e1 eid ctr))
                      ]
     BExpr op b1 b2 -> -- let lid = (myrand())::Int in
                       -- let rid = (myrand())::Int in
