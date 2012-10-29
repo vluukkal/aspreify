@@ -267,7 +267,8 @@ arel    =
           try(wrel) <|>
           try(srel) <|>          
           try(negrel) <|>
-          try(bexpr)
+          try(bexpr) <|>
+          try(atomrel)
 
 
 -- negative relation
@@ -338,31 +339,30 @@ negatomrel    = do {string "not"; many space; n <- atom
 -- parse trel "" "lc(X, Y) : arc(X, Y, L) = L"
 -- parse trel "" "not occurs(Y) : vtx(X) : Y < X"
 -- parse trel "" "blub(Foo,Bar,Goo)"
+-- parse trel "" "f : vtx(Y) : Y < X."
 trel :: GenParser Char st Body
-{--
-trel    = do {one <- srel;
-                     skipMany1 (space <|> char ':' <|> space ); 
-              two <- srel;
-              return (Typed one two)
-             }
---}
 trel    = do {one <- arel;
-                     skipMany1 (space <|> char ':' <|> space ); 
-              two <- arel;
+                     -- skipMany1 (space <|> char ':' <|> space ); 
+              skipMany1 (space <|> justcolon <|> space ); 
+              -- two <- arel;
+              -- rest <- (sepBy arel (skipMany1 (space <|> char ':')));              
+              rest <- (sepBy arel (skipMany1 (space <|> justcolon)));              
               -- the above forces that there is at least        
               -- two entries for the list of types.       
-              -- just using the below sepBy would produce an empty list.        
-              rest <- (sepBy arel (skipMany1 (space <|> char ':')));
-              return (Typed (one:two:rest))
+              return (Typed (one:rest))
              }
 
-{--
-trel    = do { 
-               mytypes <- (sepBy1 arel (skipMany1 (space <|> char ':')));
-               return (Typed mytypes)
-             }
---}
-
+-- This is needed so that heads of rules are not parsed as 
+-- beginnings of typed lists. 
+-- foo(X) :- bar(X) 
+-- could otherwise be intepreted as (foo(X)) (:) (- bar(X))
+-- which would never parse. for the 2nd part. 
+justcolon :: GenParser Char st Char
+justcolon = do {
+            g <- char ':';
+            notFollowedBy (char '-');
+            return g
+          }
 
 -- Question:
 -- parse rel "" "blub(Foo,Bar,Goo),\"no\""
@@ -374,7 +374,7 @@ trel    = do {
 -- parse rel "" "lc(X,Y) : arc(X, Y, L) = L"
 -- parse rel "" "blub(Foo,Bar,Goo)"
 -- parse rel "" "blub(Foo,Bar,Goo),chunga(Foo,Bar,Goo)" -- only the 1st one is handled
--- parse rel "" "r, s, not t" 
+-- parse rel "" "r, s, not t" -- only the 1st one is handled
 
 rel :: GenParser Char st Body
 {--
@@ -592,7 +592,7 @@ atomm    = do { r <- atom; return (r,[])}
 -- parse genrel "" "blub"
 -- parse genrel "" "blub(Foo,Bar,Goo)"
 -- parse genrel "" "waitingfor(_,_)"
--- parse genrel "" "X > Y" -- NOK 20.3 
+-- parse genrel "" "X > Y" 
 -- parse genrel "" "{blub(Foo,Bar,Goo)}"
 -- parse genrel "" "{blub(Foo,Bar,Goo),blab(Zub,Zap,Zoo)}"
 -- parse genrel "" "1{blub(Foo,Bar,Goo)}2"
@@ -606,6 +606,7 @@ atomm    = do { r <- atom; return (r,[])}
 -- parse genrel "" "{blub(Foo,\"Bar\",Goo)}"
 -- parse genrel "" "[ lc(X, Y) : arc(X, Y, L) = L ]" 
 -- parse genrel "" "not occurs(Y) : Y < X, vtx(X)" -- vtx should not be parsed 
+-- parse genrel "" "f : vtx(Y) : Y < X"
 
 -- genrel :: GenParser Char st (String,[String])
 genrel :: GenParser Char st Body
