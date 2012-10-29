@@ -52,8 +52,8 @@ examples/logic/
 All OK
 
 examples/planning/
-logistics.lp			use of const 
-				use of != instead of neq(_,_)
+plan[12].lp			misparses 'compute models' statement
+				as 'compute mod els' expression 
 
 examples/puzzles/
 Change person( ork; bog ) to person(ork). person(bog). to make
