@@ -38,19 +38,15 @@ return values, but the result file contains the syntax error.
 
 2.2 Non-supported syntax 
 
-The ASP weight constraints, aka the statements inside [ ] are 
-not handled properly, if at all. 
 The ; syntax for multiple facts is not supported (e.g. person(a; b; c).)
-Some character encodings will break the parsing, like ä or ö. 
-const syntax not supported. 
+const and other similar syntax not supported. 
 
-In the lparse release there are many examples in the examples/ 
+In the lparse release there are many example programs in the examples/ 
 directory. Here we list those that are known not to work with
 aspreify and the cause for it. 
 
 examples/graph/
-longest_cycle.lp		use of weight constraints
-traveling_salesman.lp		use of weight constraints
+All OK
 
 examples/logic/
 All OK
