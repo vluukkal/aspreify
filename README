@@ -54,6 +54,7 @@ All OK
 examples/planning/
 plan[12].lp			misparses 'compute models' statement
 				as 'compute mod els' expression 
+				What does it actually mean?
 
 examples/puzzles/
 Change person( ork; bog ) to person(ork). person(bog). to make
@@ -68,7 +69,14 @@ puzzle3.lp			person(a; b).
 TODO
 - List the produced factnames and the documentation for them
 - add directives of the lparse language
-- add support for the gringo input language 
+- add support for the gringo input language
+- have a look at quickcheck  
+
+4. Self tests 
+
+Compile the parser test suite and run it:
+> ghc -o runparsertests testaspparse.hs aspparse.hs 
+> ./runparsertests 
 
 #EOF
 
