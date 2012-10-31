@@ -354,4 +354,20 @@ unfactmyexpr a exprid ctr =
     case a of 
       Sym s -> (unfactcatom s exprid)
       Number s -> (unfactcatom s exprid)
+      Alternative l -> ("altlist(" ++ show(exprid) ++ ").\n") ++ (unaltlist l ctr exprid)
       Arith op a1 a2 -> (unfactarith op a1 a2 exprid ctr)
+
+unaltlist a ctr parentid = 
+    if length a == 0 
+    then ""
+    else 
+       let (res,ids) = List.foldl mfacts ("",0) a in res
+    where 
+      mfacts (accu,previd) i = 
+          let argid = FactRender.getnext(ctr) in 
+          let exprid = FactRender.getnext(ctr) in 
+          let new_ac = accu ++ 
+                       (unfactmyexpr i argid ctr) ++ 
+                       "altlist(" ++ show(parentid) ++ "," ++ (show (previd+1)) ++ "," ++ show(argid) ++ ").\n" 
+              in
+                (new_ac,(previd + 1))

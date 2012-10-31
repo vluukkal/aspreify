@@ -70,6 +70,9 @@ unrdfmyexpr a exprid =
     case a of 
       Sym s -> (unrdfcatom s exprid)
       Number s -> (unrdfcatom s exprid)
+      Alternative l -> -- (unrdfaltlist l ctr exprid)
+                  (show exprid) ++ ",rdf:type,http://m3.org/rls#altlist\n" ++ 
+                  (rdfargs exprid l)
       Arith op a1 a2 -> (unrdfarith op a1 a2 exprid)
 
 rdfargs parentid a = 
