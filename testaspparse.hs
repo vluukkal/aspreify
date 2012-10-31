@@ -242,6 +242,10 @@ tgenrel16 = TestCase $ assertEqual "genrel 16"  (Count (Sym (Const "any")) (Sym 
 tgenrel17 = TestCase $ assertEqual "genrel 17" (Typed [Plain (Const "occurs") [Sym (Var "Y")] False,BExpr Lt (Sym (Var "Y")) (Sym (Var "X"))]) (wrapparser_bl' genrel "" "not occurs(Y) : Y < X, vtx(X)")
 
 tgenrel18 = TestCase $ assertEqual "genrel 18" (Typed [Plain (Const "f") [] True,Plain (Const "vtx") [Sym (Var "Y")] True,BExpr Lt (Sym (Var "Y")) (Sym (Var "X"))]) (wrapparser_bl' genrel "" "f : vtx(Y) : Y < X")
+
+tgenrel19 = TestCase $ assertEqual "genrel 19" (Plain (Const "person") [Alternative [Sym (Const "a"),Sym (Const "b"),Sym (Const "c")]] True)  (wrapparser_bl' genrel "" "person(a; b; c)")
+
+
 -- tgenrel = TestCase $ assertEqual "genrel X"  (wrapparser_bl' genrel "" "")
 
 tnumericexpr1 = TestCase $ assertEqual "numericexpr 1" (Arith Plus (Sym (Const "k")) (Number (Const "2"))) (wrapparser_exp numericexpr "" "k + 2")
@@ -444,6 +448,7 @@ tnvariable3 = TestCase $ assertEqual "nvariable 3" (Var "X") (wrapparser_atom nv
 
 -- tnvariable = TestCase $ assertEqual "nvariable X"  (wrapparser_atom nvariable "" "")
 
+{--
 taltrel1 = TestCase $ assertEqual "altrel 1" (Alternative [Plain (Const "arc_S") [Sym (Var "X"),Sym (Var "Y")] True,Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y")] True]) (wrapparser_bl' altrel "" "arc_S(X, Y) ; arc(X, Y)")
 
 taltrel2 = TestCase $ assertEqual "altrel 2" (Alternative [Plain (Const "arc_S") [Sym (Var "X"),Sym (Var "Y")] False,Plain (Const "arc") [Sym (Var "X"),Sym (Var "Yo")] True])  (wrapparser_bl' altrel "" "not arc_S(X, Y) ; arc(X, Yo)")
@@ -467,6 +472,19 @@ taltrel10 = TestCase $ assertEqual "altrel 10" (Alternative [Plain (Const "f") [
 taltrel11 = TestCase $ assertEqual "altrel 11" (Alternative [Plain (Const "f") [] True,Plain (Const "vtx") [Sym (Var "Y")] True,BExpr Lt (Sym (Var "Y")) (Sym (Var "X"))]) (wrapparser_bl' altrel "" "f ; vtx(Y) ; Y < X.")
 
 -- taltrel = TestCase $ assertEqual "altrel X"  (wrapparser_bl' altrel "" "")
+--}
+
+taltexpr1 = TestCase $ assertEqual "altexpr 1" (Alternative [Sym (Const "f"),Sym (Const "g")]) (wrapparser_exp altexpr "" "f;g")
+
+taltexpr2 = TestCase $ assertEqual "altexpr 2" (Alternative [Sym (Const "f"),Sym (Const "g")]) (wrapparser_exp altexpr "" "f; g")
+
+taltexpr3 = TestCase $ assertEqual "altexpr 3"  (Alternative [Sym (Const "f"),Sym (Const "g"),Sym (Const "x"),Sym (Const "y"),Sym (Const "z")]) (wrapparser_exp altexpr "" "f ;g;x;y;z")
+
+taltexpr4 = TestCase $ assertEqual "altexpr 4"  (Alternative [Sym (Const "f"),Sym (Const "g"),Sym (Const "x"),Sym (Const "y"),Sym (Var "Z")]) (wrapparser_exp altexpr "" "f ;g;x;y;Z")
+
+taltexpr5 = TestCase $ assertEqual "altexpr 5" (Alternative [Sym (Var "Foo"),Sym (Var "Bar")]) (wrapparser_exp altexpr "" "Foo;Bar")
+
+-- taltexpr = TestCase $ assertEqual "altexpr X"  (wrapparser_expr altexpr "" "")
 
 
 
@@ -479,7 +497,7 @@ tests = TestList [ truleorfact1, truleorfact2, trulebase1, trulebase2, trulebase
                     tbody1,tbody2, tbody3, tbody4, tbody5, tbody6, tbody7, tbody8,
                     tgenrel1, tgenrel2, tgenrel3, tgenrel4, tgenrel5, tgenrel6, tgenrel7, tgenrel8,
                     tgenrel9, tgenrel10, tgenrel11, tgenrel12, tgenrel13, tgenrel14, tgenrel15, 
-                    tgenrel16, tgenrel17, tgenrel18,
+                    tgenrel16, tgenrel17, tgenrel18, tgenrel19,
                     tnumericexpr1, tnumericexpr2, tnumericexpr3,
                     tnumeric1 , tnumeric2, tnumeric3, tnumeric4, tnumeric5,
                     tnexpr1 , tnexpr2, tnexpr3, tnexpr4,
@@ -497,8 +515,9 @@ tests = TestList [ truleorfact1, truleorfact2, trulebase1, trulebase2, trulebase
                     tmyelem1, tmyelem2, tmyelem3, tmyelem4,
                     tatom1,tatom2,tatom3,tatom4,tatom5,tatom6,
                     tnvariable1, tnvariable2, tnvariable3,
-                    taltrel1,taltrel2,taltrel3,taltrel4,taltrel5,taltrel6,taltrel7,
-                    taltrel8,taltrel9,taltrel10,taltrel11
+                    taltexpr1,taltexpr2,taltexpr3,taltexpr4,taltexpr5
+                    --taltrel1,taltrel2,taltrel3,taltrel4,taltrel5,taltrel6,taltrel7,
+                    -- taltrel8,taltrel9,taltrel10,taltrel11
                     ]
 
 -- runTestTT tests
