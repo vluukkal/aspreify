@@ -37,7 +37,6 @@ module AspParse where
 import System.IO
 import System.IO.Unsafe
 import System.Random
--- import List
 import qualified Data.List as List
 import qualified Data.Map as Map
 import Text.ParserCombinators.Parsec
@@ -104,6 +103,7 @@ data BOp = Gt
 
 data MyExpr = Number Atom
             | Sym Atom
+            | Alternative [MyExpr]
             | Arith MyOp MyExpr MyExpr 
             deriving(Show,Eq)
 
@@ -114,7 +114,7 @@ data MyExpr = Number Atom
 -- parse nvariable "" "X > Y"
 nvariable :: GenParser Char st Atom
 nvariable   = do{ c  <- upper
-                ; cs <- option "" (many (noneOf "\n\r\t (){[]},.=:"))
+                ; cs <- option "" (many (noneOf "\n\r\t (){[]},.=:;"))
                 ; skipMany space
                 ; return (Var (c:cs))
                 }
@@ -136,7 +136,7 @@ variable   = anyvar <|>
 atomsimple :: GenParser Char st Atom
 atomsimple   = do{ c  <- lower
                 -- ; cs <- option "" (many (noneOf "\n\r\t (){,."))
-                ; cs <- option "" (many (noneOf "\n\r\t (){[]},.+-*/=:"))
+                ; cs <- option "" (many (noneOf "\n\r\t (){[]},.+-*/=:;"))
                 -- ; cs <- many letter
                 ; skipMany space
                 ; return (Const (c:cs))
@@ -159,20 +159,13 @@ atomquoted   = do {
 
 
 
--- parse atom "" "Foo" -- should fail 
+-- parse atom "" "Foo" -- should fail as it is a variable
 -- parse atom "" "foo"
 -- parse atom "" "\"Foo\""
 -- parse atom "" "\"wp1:Person\""
--- parse atom "" "1"
+-- parse atom "" "1" -- fails, should it?
 
 -- parse atom "" "m"
--- Fails on 09.11.2011
--- parse atom "" "M"
--- Left (line 1, column 1):
--- unexpected "M"
--- expecting a fact starting with lowercase or quoted string
-
--- atom :: GenParser Char st String
 atom :: GenParser Char st Atom 
 atom  = 
     atomquoted <|>
@@ -185,16 +178,11 @@ atom  =
     <?> "a fact starting with lowercase or quoted string"
 --}
 
-
 -- parse myelem "" "Foo"
 -- parse myelem "" "foo"
 -- parse myelem "" "_"
 -- parse myelem "" "foo,Bar,goo" -- only gives the first foo
 -- parse myelem "" "\"foo\""
--- myelem :: GenParser Char st String
--- myelem :: GenParser Char st Atom
--- myelem = choice [atom, variable]
-
 myelem :: GenParser Char st MyExpr
 myelem = 
        try(numericexpr) <?>
@@ -210,14 +198,11 @@ myelem =
 -- parse args "" "(foo)"
 -- parse args "" "(foo,Bar,goo)"
 -- parse args "" "( Foo)"
--- parse args "" "" -- this should die, actually
--- parse args "" " ( Foo,Bar )" -- this will die,  XXX 
-                                -- because of last space in front of )
+-- parse args "" "" -- should fail
+-- parse args "" " ( Foo,Bar )" 
 -- parse args "" "(1 .. k)"
 -- parse args "" "(foo,Bar,5)"
 -- parse args "" "(foo,\"Bar\",5)"
--- args :: GenParser Char st [String]
--- args :: GenParser Char st [Atom]
 args :: GenParser Char st [MyExpr]
 -- args    = do { cs <- between '(' ')' many (noneOf "\n\r\t ()")
 --               ; return cs}
@@ -234,6 +219,7 @@ data Body = Plain Atom [MyExpr] Bool
           | Card MyExpr MyExpr [Body] Bool
           | Count MyExpr MyExpr [Body] Bool
           | Typed [Body]
+          -- | Alternative [Body]
           | Weighed MyExpr Body
           | BExpr BOp MyExpr MyExpr 
           | Assign Atom MyExpr
@@ -246,7 +232,7 @@ data Rules = Rule Body [Body]
            | Show [Body]
            | Hide [Body]
            | Consts [Body]
-            deriving (Show)
+            deriving (Show,Eq)
 
 -- an aggregate to contain negrel, wrel and srel from below
 -- parse arel "" "arc(X, Y, L) = L"
@@ -258,6 +244,27 @@ arel    =
           try(bexpr) <|>
           try(atomrel)
 
+{--
+varrel :: GenParser Char st Body
+varrel    = do {n <- variable
+            ;return (Plain n [] True)}
+
+-- varexpr :: GenParser Char st MyExpr
+-- varexpr    = (Sym variable)
+            
+
+-- Like above but include single variables here
+-- This is to use with altrel only
+arel' :: GenParser Char st Body
+arel'    = 
+          try(wrel) <|>
+          try(srel) <|>          
+          try(negrel) <|>
+          try(bexpr) <|> -- note that this has to be before the ones below!
+          try(atomrel)  <|>
+          try(varrel)  
+          -- try(myelem)
+--}
 
 -- negative relation
 -- parse negrel "" "not blub(Foo,Bar,Goo)"
@@ -289,14 +296,9 @@ wrel    = do {
 -- parse srel "" "blub(Foo,Bar,Goo),chunga(Foo,Bar,Goo)" -- only the 1st one is handled
 -- parse srel "" "r, s, not t" -- unexpected ','
 -- parse srel "" "color(1 .. k)"
--- Fails on 9.11.2011
 -- parse srel "" "blub(Foo,\"Bar\",Goo)"
--- Left (line 1, column 10):
--- unexpected "\""
--- expecting A numeric expression inside a fact
 
 -- A simple relation 
--- srel :: GenParser Char st (String,[String])
 srel :: GenParser Char st Body
 srel    = do {n <- atom; many space;
             ;myargs <- args
@@ -304,7 +306,7 @@ srel    = do {n <- atom; many space;
 
 -- parse atomrel "" "blub(Foo,Bar,Goo)"
 -- parse atomrel "" "blub(Foo,Bar,Goo),chunga(Foo,Bar,Goo)" -- only the 1st one is handled
--- parse atomrel "" "r, s, not t" -- unexpected ','
+-- parse atomrel "" "r, s, not t" 
 -- A simple atom 
 atomrel :: GenParser Char st Body
 atomrel    = try(negatomrel) <|>
@@ -324,7 +326,7 @@ negatomrel    = do {string "not"; many space; n <- atom
 -- parse trel "" "not arc_S(X, Y) : arc(X, Yo)"
 -- parse trel "" "lc(X, Y) : arc(X, Y, L) = L"
 -- parse trel "" "not occurs(Y) : vtx(X) : Y < X"
--- parse trel "" "blub(Foo,Bar,Goo)"
+-- parse trel "" "blub(Foo,Bar,Goo)" -- fails, not typed 
 -- parse trel "" "f : vtx(Y) : Y < X."
 trel :: GenParser Char st Body
 trel    = do {one <- arel;
@@ -334,6 +336,43 @@ trel    = do {one <- arel;
               -- two entries for the list of types.       
               return (Typed (one:rest))
              }
+
+-- alternative relation 
+-- parse altexpr "" "f;g"
+-- parse altexpr "" "f ;g;x;y;z" -- OK 
+-- parse altexpr "" "Foo;Bar" -- NOK, but should be OK
+-- parse altexpr "" "f ;g;x;y;Z" -- NOK
+
+-- These here are not even tested at this point, but left here as 
+-- reminder of legacy. 
+-- parse altexpr "" "arc_S(X, Y) ; arc(X, Y)" -- NOK
+-- parse altexpr "" "not arc_S(X, Y) ; arc(X, Yo)" -- NOK
+-- parse altexpr "" "lc(X, Y) ; arc(X, Y, L) = L" -- NOK
+-- parse altexpr "" "not occurs(Y) ; vtx(X) ; Y < X" -- NOK
+-- parse altexpr "" "f ; vtx(Y) ; Y < X." -- NOK
+-- parse altexpr "" "blub(Foo;Bar,Bar;Foo,Goo;Moo)" -- NOK, as it should be 
+-- altrel :: GenParser Char st Body -- added 
+altexpr :: GenParser Char st MyExpr 
+altexpr    = do { -- one <- numericexpr; -- this will diverge
+              one <- numeric;
+              skipMany1 (space <|> char ';' <|> space ); 
+              -- rest <- (sepBy numericexpr (skipMany1 (space <|> char ';')));              
+              rest <- (sepBy numeric (skipMany1 (space <|> char ';')));              
+              -- the above forces that there is at least        
+              -- two entries for the list of types.       
+              return (Alternative (one:rest))
+             }
+{--
+altrel    = do {one <- arel;
+              skipMany1 (space <|> char ';' <|> space ); 
+              rest <- (sepBy arel (skipMany1 (space <|> char ';')));              
+              -- the above forces that there is at least        
+              -- two entries for the list of types.       
+              return (Alternative (one:rest))
+             }
+--}
+
+
 
 -- This is needed so that heads of rules are not parsed as 
 -- beginnings of typed lists. 
@@ -349,7 +388,7 @@ justcolon = do {
 
 -- Question:
 -- parse rel "" "blub(Foo,Bar,Goo),\"no\""
--- fails sot that no is not detected
+-- fails so that no is not detected
 -- Where do we allow not?
 -- only for facts and atoms, but also inside choices?
 -- parse rel "" "arc(X, Y, L) = L"
@@ -358,6 +397,7 @@ justcolon = do {
 -- parse rel "" "blub(Foo,Bar,Goo)"
 -- parse rel "" "blub(Foo,Bar,Goo),chunga(Foo,Bar,Goo)" -- only the 1st one is handled
 -- parse rel "" "r, s, not t" -- only the 1st one is handled
+-- parse rel "" "not r, s, not t" -- only the 1st one is handled
 
 rel :: GenParser Char st Body
 {--
@@ -402,12 +442,10 @@ listsep = do {
 -- parse mychoice "" "{blub(Foo,Bar,Goo)}"
 -- parse mychoice "" "{  sat(C) : clause(C) } k-1" 
 -- parse mychoice "" "{ lc(X, Y) : arc(X, Y, L) : mooh(Z) } 1"  
--- parse mychoice "" "1 { p, t }"  -- expects } 
--- parse mychoice "" "{ p, t, not x}" -- does work 
--- parse mychoice "" "{ p, t, not x }" -- does not work
--- parse mychoice "" "1 { p, not t t}"  --- works 
--- Right (Card (Number (Const "1")) (Sym (Const "any")) [Plain (Const "p") [] True,Plain (Const "t") [] False,Plain (Const "t") [] True] True)
--- mychoice :: GenParser Char st (String,[String])
+-- parse mychoice "" "1 { p, t }" 
+-- parse mychoice "" "{ p, t, not x}" 
+-- parse mychoice "" "{ p, t, not x }" 
+-- parse mychoice "" "1 { p, not t t}"  --- error, as it should be 
 mychoice :: GenParser Char st Body
 mychoice    = do { low <- option (Sym (Const "any")) numericexpr; -- aggregateconst;
                    content <- 
@@ -444,7 +482,6 @@ mychoiceold    = do { low <- option (Sym (Const "any")) numericexpr; -- aggregat
 -- parse mycount "" "[  sat(C) : clause(C) ] k-1" 
 -- parse mycount "" "k [ lc(X, Y) : arc(X, Y, L) = L ]"
 -- parse mycount "" "k [ lc(X, Y) : arc(X, Y, L) = L]" -- OK
-  -- mycount :: GenParser Char st (String,[String])
 mycount :: GenParser Char st Body
 mycount    = do { low <- option (Sym (Const "any")) numericexpr; -- aggregateconst;
                    content <- 
@@ -517,7 +554,12 @@ myop    =
     try(do {s <- string "mod"; return Mod})
            <?> "Expected an arithmetic operation: +,-,*,/,mod"
 
+-- Urgh, here we are limiting to two-op expressions.
+-- Use the dedicated inbuilt expr parser?
 -- parse nexpr "" "k + 2"
+-- parse nexpr "" "k + 2 + Z" -- will not parse Z
+-- parse nexpr "" "k + Z"
+-- parse nexpr "" "k + + Z" -- parse error
 nexpr :: GenParser Char st MyExpr
 nexpr = do { 
               -- a1 <- numericexpr; 
@@ -529,10 +571,11 @@ nexpr = do {
               a2 <- numeric; 
               return (Arith o a1 a2)
         }
--- parse numericexpr "" "1 + 2"
--- parse numericexpr "" "k + 2"
--- parse numericexpr "" "k"
--- parse numericexpr "" "1"
+-- parse numeric "" "1 + 2" -- only 1 parsed
+-- parse numeric "" "k + 2" -- only k parsed
+-- parse numeric "" "k"
+-- parse numeric "" "1"
+-- parse numeric "" "X"
 numeric :: GenParser Char st MyExpr
 numeric    =
 {--
@@ -556,8 +599,14 @@ numeric    =
 -- parse numericexpr "" "k + 2"
 -- parse numericexpr "" "k"
 -- parse numericexpr "" "1"
+-- parse numericexpr "" "1;2"
+-- parse numericexpr "" "g;k"
+-- parse numericexpr "" "X;Y"
+-- parse numericexpr "" "X"
+numericexpr :: GenParser Char st MyExpr
 numericexpr = 
     try(nexpr) <|>
+    try (altexpr) <|> -- added 
     try(numeric)
     <?> "A numeric expression"
 
@@ -589,8 +638,7 @@ atomm    = do { r <- atom; return (r,[])}
 -- parse genrel "" "[ lc(X, Y) : arc(X, Y, L) = L ]" 
 -- parse genrel "" "not occurs(Y) : Y < X, vtx(X)" -- vtx should not be parsed 
 -- parse genrel "" "f : vtx(Y) : Y < X"
-
--- genrel :: GenParser Char st (String,[String])
+-- parse genrel "" "person(a; b; c)"
 genrel :: GenParser Char st Body
 genrel    = 
             try(mychoice) <|>
@@ -605,24 +653,21 @@ genrel    =
            <?> "relation, choice or simple atom"
 
 -- parse body "" "blub(Foo,Bar,Goo), blab(Baa), bii"
--- parse body "" "blub(Foo,Bar,Goo), blab(Baa), bii"
 -- parse body "" "vtx(X), vtx(Y), X < Y, not r(X, Y)"
 -- parse body "" "not arc_S(X, Y) : arc(X, Y), vtx(Y)"
 -- parse body "" "not arc_S(X, Y) : arc(X, Y)"
--- parse body "" "occurs(X), not occurs(Y) : Y < X, vtx(X)" -- Up until ':'
+-- parse body "" "occurs(X), not occurs(Y) : Y < X, vtx(X)"
 -- parse body "" "not occurs(Y) : Y < X, vtx(X)" 
 -- parse body "" "occurs(X), not occurs(Y) : vtx(X) : Y < X, vtx(X)" 
 -- parse body "" "waitingfor(_,_)."
--- body :: GenParser Char st [(String,[String])]
 body :: GenParser Char st [Body]
 body    = do (sepBy genrel (skipMany1 (space <|> char ',')))
 
--- parse rule "" "blub(Foo,Bar,Goo) :-  blab(Baa), bii." -- NOK
+-- parse rule "" "blub(Foo,Bar,Goo) :-  blab(Baa), bii."
 -- parse rule "" "blub(Foo,Bar,Goo) :-  blab(Baa),\n bii."
 -- parse rule "" "ok :- k [ lc(X, Y) : arc(X, Y, L) = L ] ."
 -- parse rule "" "initial(X) :- occurs(X), not occurs(Y) : Y < X, vtx(X)." 
 -- parse rule "" "{ lc(X, Y) : arc(X, Y, L) } 1 :- vtx(X)." 
--- parse rule "" "ok :- k [ lc(X, Y) : arc(X, Y, L) = L ] ." 
 -- parse rule "" "occurs(X) :- lc(X, Y), arc(X, Y, L)."
 -- parse rule "" "initial(X) :- occurs(X), not occurs(Y) : vtx(X) : Y < X, vtx(X)."
 -- parse rule "" "r(Y) :- lc(X, Y), initial(X), arc(X, Y, L)."             
@@ -635,8 +680,6 @@ body    = do (sepBy genrel (skipMany1 (space <|> char ',')))
 -- parse rule "" "ready(A :- \"rdf:type\"(A,\"wp1:Activity\"), not missing_commit(A)." -- should fail
 -- parse rule "" "ready(A) :- \"rdf:type\" A,\"wp1:Activity\"), not missing_commit(A)." -- should fail
              
--- rule :: GenParser Char st ((String,[String]),[(String,[String])])
--- rule :: GenParser Char st (Body,[Body])
 rule :: GenParser Char st Rules    
 rule    = do { 
                n <- genrel; 
@@ -656,7 +699,6 @@ rule    = do {
 -- parse deny "" ":- vtx(X), vtx(Y), X < Y, not r(X, Y)."
 -- parse deny "" ":- not ok."
 -- parse deny "" ":- vtx(X), occurs(X), not r(X)."
--- deny :: GenParser Char st ((String,[String]),[(String,[String])])
 deny :: GenParser Char st Rules
 deny    = do { 
                string ":-"; 
@@ -863,6 +905,7 @@ unmyexpr a =
     case a of 
       Sym s -> (unatom s)
       Number s -> (unatom s)
+      Alternative l -> List.concat $ (List.intersperse ";" (List.foldr (\x accu -> (unmyexpr x):accu) [] l))
       Arith op a1 a2 -> (unarith op a1 a2)
 
 
