@@ -271,6 +271,11 @@ rdfitem id i accu =
                 ""
       Show l -> accu 
       Hide l -> accu 
+      External l -> accu 
+      Function l -> accu 
+      Minimize l -> accu 
+      Maximize l -> accu 
+      Computes n l -> accu 
       Consts l -> accu ++ preflink ++ show(ruleid) ++ ",rdf:type,http://m3.org/rls#constdef\n" ++
                  (L.foldr (++) "" (L.foldr (rdfbody' "http://m3.org/rls#hasbody" ruleid) [] l))
 

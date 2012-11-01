@@ -118,6 +118,11 @@ factitem id ctr i accu =
                 -- ""
       Show l -> accu 
       Hide l -> accu 
+      External l -> accu 
+      Function l -> accu 
+      Minimize l -> accu 
+      Maximize l -> accu 
+      Computes n l -> accu 
       Consts l -> accu ++ ctext ++ cnstlink ++ 
                   "constdef(" ++ show(ruleid) ++ ")." ++ "\n" ++
                   (List.foldr (++) "" (List.foldr (factbody "" ruleid ctr) [] l))
