@@ -108,6 +108,21 @@ txtitem i accu =
       Consts l -> accu ++ L.unwords(L.intersperse ",\n" 
                                 (L.foldr (\x a -> ("const " ++ x):a) [] 
                                  (L.foldr txtbody' [] (l)))) ++ ".\n\n"
+      External l -> accu ++ L.unwords(L.intersperse ",\n" 
+                                (L.foldr (\x a -> ("external " ++ x):a) [] 
+                                 (L.foldr txtbody' [] (l)))) ++ ".\n\n"
+      Function l -> accu ++ L.unwords(L.intersperse ",\n" 
+                                (L.foldr (\x a -> ("function " ++ x):a) [] 
+                                 (L.foldr txtbody' [] (l)))) ++ ".\n\n"
+      Minimize l -> accu ++ L.unwords(L.intersperse ",\n" 
+                                (L.foldr (\x a -> ("minimize " ++ x):a) [] 
+                                 (L.foldr txtbody' [] (l)))) ++ ".\n\n"
+      Maximize l -> accu ++ L.unwords(L.intersperse ",\n" 
+                                (L.foldr (\x a -> ("maximize " ++ x):a) [] 
+                                 (L.foldr txtbody' [] (l)))) ++ ".\n\n"
+      Computes n l -> accu ++ L.unwords(L.intersperse ",\n" 
+                                (L.foldr (\x a -> ("compute " ++ unatom(n) ++ " " ++ x):a) [] 
+                                 (L.foldr txtbody' [] (l)))) ++ ".\n\n"
 
 
 txtrender rb = 
