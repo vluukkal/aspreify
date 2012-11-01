@@ -231,7 +231,12 @@ data Rules = Rule Body [Body]
            | Fact [Body]
            | Show [Body]
            | Hide [Body]
+           | External [Body]
+           | Function [Body]
+           | Minimize [Body]
+           | Maximize [Body]
            | Consts [Body]
+           | Computes Atom [Body]
             deriving (Show,Eq)
 
 -- an aggregate to contain negrel, wrel and srel from below
@@ -733,6 +738,24 @@ hidef    = do {
                Fact f <- fact;
                return (Hide f) }
 
+-- parse extdef "" "external f(X,Y,b)."
+extdef :: GenParser Char st Rules
+extdef    = do { 
+               string "external";
+               skipMany1 space; 
+               Fact f <- fact;
+               return (External f) }
+
+-- parse funcdef "" "function f."
+funcdef :: GenParser Char st Rules
+funcdef    = do { 
+               string "function";
+               skipMany1 space; 
+               f <- atom;
+               skipMany space; 
+               string ".";
+               return (Function [(Plain f [] True)]) }
+
 -- parse constdef "" "const k = 10."
 constdef :: GenParser Char st Rules
 constdef    = do { 
@@ -744,6 +767,47 @@ constdef    = do {
                e <- numericexpr;
                char '.'; 
                return (Consts [(Assign nm e)]) }
+
+-- parse mindef "" "minimize [a1,a2]."
+-- parse mindef "" "minimize [a1 =5,a2=6,a3]."
+-- parse mindef "" "minimize {b1,b2}."
+-- parse mindef "" "minimize [a1(X),a2]." -- this should not parse, but we overapproximate
+mindef :: GenParser Char st Rules
+mindef    = do { 
+               string "minimize";
+               skipMany1 space; 
+               b <- choiceorcount;
+               skipMany space; 
+               string ".";
+               return (Minimize [b]) }
+
+-- parse mindef "" "maximize [a1,a2]."
+-- parse mindef "" "maximize {b1,b2}."
+maxdef :: GenParser Char st Rules
+maxdef    = do { 
+               string "maximize";
+               skipMany1 space; 
+               b <- choiceorcount;
+               skipMany space; 
+               string ".";
+               return (Minimize [b]) }
+
+choiceorcount = 
+              try(mycount) <|>
+              try(mychoice)
+
+-- parse compute "" "compute models {b1,b2}."
+-- parse compute "" "compute Models {b1,b2}." -- should fail 
+compute :: GenParser Char st Rules
+compute    = do { 
+               string "compute";
+               skipMany1 space;
+               n <- atom; 
+               skipMany space; -- atom may already eat the trailing space 
+               b <- choiceorcount;
+               skipMany space; 
+               string ".";
+               return (Computes n [b]) }
 
 -- parse showorhide "" "show waitingfor(_,_)."
 
@@ -798,7 +862,12 @@ ruleorfact = try(rule) <|>
 threerule = do {
             skipMany space;
             try(showorhide) <|> -- the following have fixed keywords in the beginning
-            try(constdef) <|>   -- that's why we can try them 
+            try(constdef) <|>   -- that's why we try them before the general ones
+            try(compute) <|>   --
+            try(maxdef) <|>   --
+            try(mindef) <|>   --
+            try(funcdef) <|>   --
+            try(extdef) <|>   --
             deny <|>     -- here we estart with the generic ones, if they all are tried
             ruleorfact   -- the error messages are suppressed 
             <?> "rule, denial or fact, ugh"}
