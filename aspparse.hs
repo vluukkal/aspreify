@@ -219,10 +219,11 @@ data Body = Plain Atom [MyExpr] Bool
           | Card MyExpr MyExpr [Body] Bool
           | Count MyExpr MyExpr [Body] Bool
           | Typed [Body]
-          -- | Alternative [Body]
+          -- | Alternative [Body] 
           | Weighed MyExpr Body
           | BExpr BOp MyExpr MyExpr 
           | Assign Atom MyExpr
+          | Arity Atom String
           | Empty 
             deriving (Show,Eq)
 
@@ -230,7 +231,9 @@ data Rules = Rule Body [Body]
            | Deny [Body]
            | Fact [Body]
            | Show [Body]
-           | Hide [Body]
+           | GShow [Body]       -- Gringo syntax
+           | Hide [Body]        
+           | GHide [Body]       -- Gringo syntax
            | External [Body]
            | Function [Body]
            | Minimize [Body]
@@ -724,19 +727,109 @@ fact    = do {
                char '.';
                return (Fact b) }
 
+-- The replication of hide and show should be redone
+----------------------------------------------------
 showf :: GenParser Char st Rules
-showf    = do { 
+showf    = try (showfc) <|> 
+           try (showfempty)
+
+hidef :: GenParser Char st Rules
+hidef    = try (hidefc) <|> 
+           try (hidefempty)
+
+
+showfc :: GenParser Char st Rules
+showfc    = do { 
                string "show";
                skipMany1 space; 
                Fact f <- fact;
                return (Show f) }
 
-hidef :: GenParser Char st Rules
-hidef    = do { 
+hidefc :: GenParser Char st Rules
+hidefc    = do { 
                string "hide";
                skipMany1 space; 
                Fact f <- fact;
                return (Hide f) }
+
+showfempty :: GenParser Char st Rules
+showfempty    = do { 
+               string "show";
+               skipMany space; 
+               char '.';
+               return (Show [Empty]) }
+
+hidefempty :: GenParser Char st Rules
+hidefempty    = do { 
+               string "hide";
+               skipMany space; 
+               char '.';
+               return (Hide [Empty]) }
+
+----------------------------------------------------
+-- Gringo versions of show and hide
+
+gshowfc :: GenParser Char st Rules
+gshowfc    = do { 
+               string "#show";
+               skipMany1 space; 
+               Fact f <- fact;
+               return (GShow f) }
+
+ghidefc :: GenParser Char st Rules
+ghidefc    = do { 
+               string "#hide";
+               skipMany1 space; 
+               Fact f <- fact;
+               return (GHide f) }
+
+gshowfarity :: GenParser Char st Rules
+gshowfarity    = do { 
+               string "#show";
+               skipMany space; 
+               a <- atom;
+               char '/';
+               skipMany space; 
+               Const n <- anumber;
+               skipMany space; 
+               char '.';
+               return (GShow [Arity a n]) }
+
+ghidefarity :: GenParser Char st Rules
+ghidefarity    = do { 
+               string "#hide";
+               skipMany space; 
+               a <- atom;
+               char '/';
+               skipMany space; 
+               Const n <- anumber;
+               skipMany space; 
+               char '.';
+               return (GHide [Arity a n]) }
+
+gshowfempty :: GenParser Char st Rules
+gshowfempty    = do { 
+               string "#show";
+               skipMany space; 
+               char '.';
+               return (GShow [Empty]) }
+
+ghidefempty :: GenParser Char st Rules
+ghidefempty    = do { 
+               string "#hide";
+               skipMany space; 
+               char '.';
+               return (GHide [Empty]) }
+
+gshowf :: GenParser Char st Rules
+gshowf    = try (gshowfc) <|> 
+           try (gshowfarity) <|>
+           try (gshowfempty)
+
+ghidef :: GenParser Char st Rules
+ghidef    = try (ghidefc) <|> 
+           try (ghidefarity) <|> 
+           try (ghidefempty)
 
 -- parse extdef "" "external f(X,Y,b)."
 extdef :: GenParser Char st Rules
@@ -810,11 +903,17 @@ compute    = do {
                return (Computes n [b]) }
 
 -- parse showorhide "" "show waitingfor(_,_)."
-
+-- parse showorhide "" "#show waitingfor(_,_)."
+-- parse showorhide "" "#hide waitingfor(_,_)."
+-- parse showorhide "" "#hide."
+-- parse showorhide "" "#hide pos/3."
+-- parse showorhide "" "#show pos/3."
 showorhide :: GenParser Char st Rules
 showorhide    = 
               try(showf) <|> 
-              try(hidef)
+              try(hidef) <|>
+              try(gshowf) <|> 
+              try(ghidef) 
 
 
 -- parse rulebase "" ":-  blab(Baa),\n bii."
@@ -833,6 +932,9 @@ showorhide    =
 -- parse rulebase "" "ready(A) :- \"rdf:type\" A,\"wp1:Activity\"), not missing_commit(A)." -- should fail
 -- parse rulebase "" "k { in(X) : vtx(X) }.\n:- in(X), in(Y), not arc(X, Y), vtx(X), vtx(Y).\n"
 -- parse rulebase "" "const k = 10."
+-- parse rulebase "" "#hide.\n#show dom/1.\n"
+-- parse rulebase "" "#hide.\n#show dom/1.\n{ dom(U) : vtx(U) }."
+-- parse rulebase "" "#hide.\n#show dom/1.\n{ dom(U) : vtx(U) }.\nuedge(U,V) :- edge(U,V), U < V."
 
 
 rulebase :: GenParser Char st [Rules]
