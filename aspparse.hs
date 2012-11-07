@@ -529,13 +529,13 @@ aggregateconst    =
 -- parse mybop "" ">"
 mybop :: GenParser Char st BOp
 mybop    = 
-    try(do {c <- char '>'; return Gt}) <|>
-    try(do {c <- char '<'; return Lt}) <|>
-    try(do {c <- char '='; return Eq}) <|>
     try(do {s <- string "<="; return LtEq}) <|> 
     try(do {s <- string ">="; return GtEq}) <|> 
     try(do {s <- string "!="; return Neq}) <|> 
-    try(do {s <- string "=="; return Eqeq}) 
+    try(do {s <- string "=="; return Eqeq}) <|>
+    try(do {c <- char '>'; return Gt}) <|>
+    try(do {c <- char '<'; return Lt}) <|>
+    try(do {c <- char '='; return Eq}) 
            <?> "Expected a comparison operation: >,<,<=,>=,=,=="
 
 -- parse bexpr "" "k > 2"
