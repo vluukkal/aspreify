@@ -282,7 +282,9 @@ factbody rel parentid ctr r accu =
            (unfactcatom nm nid) ++ 
            (unfactmyexpr e eid ctr)
            ]
-    Empty -> accu ++ [" NONE "]
+    -- Empty -> accu ++ [" NONE "]
+    Empty -> accu 
+    Arity a n -> accu
 
 factargs parentid a ctr = 
     if length a == 0 

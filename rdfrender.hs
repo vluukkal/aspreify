@@ -250,7 +250,9 @@ rdfbody' rel parentid r accu =
              -- show (factid) ++ ",rdf:type,http://m3.org/rls#bexpr\n" ++ 
              show (factid) ++ ",http://m3.org/rls#constnm," ++ (unrdfcatom nm nid) ++ 
              show (factid) ++ ",http://m3.org/rls#constval," ++ (unrdfmyexpr e eid )]
-    Empty -> accu ++ [" NONE "]
+    -- Empty -> accu ++ [" NONE "]
+    Empty -> accu
+    Arity a n -> accu
 
 rdfitem id i accu =
     -- 1st we make an unique identifier for this rule
