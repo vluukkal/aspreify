@@ -207,6 +207,22 @@ rdfbody' rel parentid r accu =
                                        -- show(unrdfmyexpr max maxexprid) ++ 
                                        (unrdfmyexpr max maxexprid))
                        ]
+    Optimize minmax b nonneg -> let myrel = (if rel == "" then "http://m3.org/rls#hashead" else rel)
+                        in 
+                          accu ++ 
+                       [show(parentid) ++ "," ++ myrel ++ "," ++ 
+                        show(factid) ++ "\n" ++
+                        show(factid) ++ ",rdf:type,http://m3.org/rls#count\n" ++
+                        show(factid) ++ ",owl:subClassof,http://m3.org/rls#stmt\n" ++
+                        (if nonneg then "" 
+                         else (show(factid) ++ 
+                                       ",http://m3.org/rls#negated,\"yes\"\n")) ++ 
+                        (if minmax then (show(factid) ++ ",http://m3.org/rls#optimize,\"max\"\n")
+                         else (show(factid) ++ ",http://m3.org/rls#optimize,\"min\"\n")) ++ 
+                        (L.foldr (++) "" 
+                         (L.foldr 
+                          (rdfbody' "http://m3.org/rls#hasbody" factid) [] b))
+                       ]
     Typed b -> let myrel = (if rel == "" then "http://m3.org/rls#hashead" else rel)
                         in 
                    accu ++ 
@@ -219,7 +235,7 @@ rdfbody' rel parentid r accu =
                       (L.foldr
                        (rdfbody' "http://m3.org/rls#hastype" factid) [] b
                       ))]
-    Weighed e1 b1 -> let wid = (myrand())::Int in
+    Weighed e1 b1 nonneg -> let wid = (myrand())::Int in
                      let eid = (myrand())::Int in
                      let myrel = (if rel == "" then "http://m3.org/rls#hashead" else rel)
                      in 
@@ -232,6 +248,8 @@ rdfbody' rel parentid r accu =
                      -- show(parentid) ++ ",rdf:type,http://m3.org/rls#qual\n" ++
                       show(factid) ++ ",owl:subClassof,http://m3.org/rls#stmt\n" ++
                      -- (head(rdfbody' "http://m3.org/rls#weighed" eid b1 [])) ++  
+                     (if nonneg then "" 
+                     else (show(factid) ++ ",http://m3.org/rls#negated,\"yes\"\n")) ++ 
                      (head(rdfbody' "http://m3.org/rls#weighed" factid b1 [])) ++  
                      show (factid) ++ ",http://m3.org/rls#weight," ++ (unrdfmyexpr e1 wid) -- ++ "\n" 
                      ]
@@ -250,6 +268,16 @@ rdfbody' rel parentid r accu =
              -- show (factid) ++ ",rdf:type,http://m3.org/rls#bexpr\n" ++ 
              show (factid) ++ ",http://m3.org/rls#constnm," ++ (unrdfcatom nm nid) ++ 
              show (factid) ++ ",http://m3.org/rls#constval," ++ (unrdfmyexpr e eid )]
+    Assignment nm e nonneg -> 
+           let nid = (myrand())::Int in
+           let eid = (myrand())::Int in
+            [show (factid) ++ "\n" ++ 
+             -- show (factid) ++ ",rdf:type,http://m3.org/rls#bexpr\n" ++ 
+             (if nonneg then "" 
+              else (show(factid) ++ ",http://m3.org/rls#negated,\"yes\"\n")) ++ 
+             show (factid) ++ ",http://m3.org/rls#constnm," ++ (unrdfcatom nm nid) ++ 
+             -- show (factid) ++ ",http://m3.org/rls#constval," ++ (unrdfmyexpr e eid )]
+             show (factid) ++ ",http://m3.org/rls#constval," ++ L.head (rdfbody' "http://m3.org/rls#hasbody" eid e [])]
     -- Empty -> accu ++ [" NONE "]
     Empty -> accu
     Arity a n -> accu
@@ -273,6 +301,8 @@ rdfitem id i accu =
                 ""
       Show l -> accu 
       Hide l -> accu 
+      GShow l -> accu 
+      GHide l -> accu 
       External l -> accu 
       Function l -> accu 
       Minimize l -> accu 

@@ -81,13 +81,20 @@ txtbody' r accu =
                               L.unwords((L.intersperse "," (L.foldr txtbody' [] b))) ++ 
                               "]" ++
                             (if max == (Sym (Const "any")) then "" else (" " ++ unmyexpr(max)))]
+    Optimize opt b nonneg -> accu ++ 
+                             [(if opt == True then "#max" else "#min") ++ 
+                             "[" ++ 
+                              -- (head(txtbody' b [])) ++ 
+                              L.unwords((L.intersperse "," (L.foldr txtbody' [] b))) ++ 
+                              "]"]
     Typed bl -> accu ++
                 [L.unwords((L.intersperse " : " (L.foldr txtbody' [] (L.reverse bl) )))]
-    Weighed e1 b1 -> accu ++ [(L.head(txtbody' b1 [])) ++ " = " ++ 
+    Weighed e1 b1 nonneg -> accu ++ [(if nonneg then "" else "not ") ++ (L.head(txtbody' b1 [])) ++ " = " ++ 
                    (unmyexpr e1) ]
     BExpr op b1 b2 -> accu ++ [(unmyexpr b1) ++ " " ++ (unbop op) ++ " " ++ 
                    (unmyexpr b2)]
     Assign nm e -> accu ++ [(unatom nm) ++ " = " ++ (unmyexpr e)]
+    Assignment nm e nonneg -> accu ++ [(if nonneg then "" else "not ") ++ (unatom nm) ++ " = " ++ L.head (txtbody' e [])]
     -- Empty -> accu ++ [" NONE "]
     Empty -> accu ++ [""]
     -- Empty -> accu ++ []

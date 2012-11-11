@@ -218,11 +218,13 @@ args    = do { words <- between (skipMany1 (space <|> char '(' <|> space ))
 data Body = Plain Atom [MyExpr] Bool
           | Card MyExpr MyExpr [Body] Bool
           | Count MyExpr MyExpr [Body] Bool
+          | Optimize Bool [Body] Bool -- min|max, 
           | Typed [Body]
           -- | Alternative [Body] 
-          | Weighed MyExpr Body
+          | Weighed MyExpr Body Bool
           | BExpr BOp MyExpr MyExpr 
           | Assign Atom MyExpr
+          | Assignment Atom Body Bool -- urgh, we have to separate between 
           | Arity Atom String
           | Empty 
             deriving (Show,Eq)
@@ -234,23 +236,48 @@ data Rules = Rule Body [Body]
            | GShow [Body]       -- Gringo syntax
            | Hide [Body]        
            | GHide [Body]       -- Gringo syntax
-           | External [Body]
-           | Function [Body]
+           | External [Body]    
+           | Function [Body]    
            | Minimize [Body]
            | Maximize [Body]
            | Consts [Body]
            | Computes Atom [Body]
             deriving (Show,Eq)
 
--- an aggregate to contain negrel, wrel and srel from below
 -- parse arel "" "arc(X, Y, L) = L"
 arel :: GenParser Char st Body
-arel    = 
+arel    = try(arel'') <|> 
+          arel' 
+
+
+-- an aggregate to contain negrel, wrel and srel from below
+arel' :: GenParser Char st Body
+arel'    = 
           try(wrel) <|>
           try(srel) <|>          
           try(negrel) <|>
           try(bexpr) <|>
           try(atomrel)
+
+-- parse arel'' "" "not M = [ est(I,S) : est(I,S) : hasest(I) = S ]" -- NOK
+-- parse arel'' "" "not arc(X, Y, L) = L"
+arel'' :: GenParser Char st Body
+arel'' = do {
+       string "not";
+       skipMany1 space;
+       cntent <- arel;
+       return (negateabody cntent)
+}
+
+negateabody x = 
+ case x of 
+      Plain n a nonneg -> Plain n a False
+      Card min max b nonneg -> Card min max b False
+      Count min max b nonneg -> Count min max b False
+      Optimize opt b nonneg -> Optimize opt b False
+      Assignment a b nonneg -> Assignment a b False
+      Weighed a b nonneg -> Weighed a b False
+      _ -> x
 
 {--
 varrel :: GenParser Char st Body
@@ -286,6 +313,8 @@ negrel    = do {
 
 -- weighed relation
 -- parse wrel "" "arc(X, Y, L) = L"
+-- parse wrel "" "arc(X, Y, L) = 1..L" -- OK
+-- parse wrel "" "L = 1..X" -- NOK 
 wrel :: GenParser Char st Body
 wrel    = do {
             -- we could call here arel, but it blows the stack
@@ -296,7 +325,7 @@ wrel    = do {
             ;many space          
             ;weight <- numericexpr
             ;many space          
-            ;return (Weighed weight (Plain n myargs True))}
+            ;return (Weighed weight (Plain n myargs True) True)}
 
 --
 -- simple relation 
@@ -406,7 +435,7 @@ justcolon = do {
 -- parse rel "" "blub(Foo,Bar,Goo),chunga(Foo,Bar,Goo)" -- only the 1st one is handled
 -- parse rel "" "r, s, not t" -- only the 1st one is handled
 -- parse rel "" "not r, s, not t" -- only the 1st one is handled
-
+-- parse rel "" "ttask(I,D) : ttask(I,D) : not haslet(I) : not tsklet(I) = D"
 rel :: GenParser Char st Body
 {--
 rel     = try(negrel) <|>
@@ -444,6 +473,33 @@ listsep = do {
   char ',';
   skipMany space;
   }
+
+-- parse myassign "" "M = #min [ est(I,S) : est(I,S) : hasest(I) = S ]" 
+-- parse myassign "" "M = [ est(I,S) : est(I,S) : hasest(I) = S ]"
+myassign :: GenParser Char st Body
+myassign = 
+         try(myassign') <|>
+         try(myassign'') 
+
+myassign' :: GenParser Char st Body
+myassign' = do {
+         lh <- lefthand;
+         skipMany space;
+         char '=';
+         skipMany space;
+         c <- myoptimize;
+         return (Assignment lh c True)
+}
+myassign'' :: GenParser Char st Body
+myassign'' = do {
+         lh <- lefthand;
+         skipMany space;
+         char '=';
+         skipMany space;
+         c <- mycount;
+         return (Assignment lh c True)
+}
+
 
 -- parse mychoice "" "1 {blub(Foo,Bar,Goo)} 2"
 -- parse mychoice "" "M{blub(Foo,Bar,Goo)}"
@@ -490,6 +546,9 @@ mychoiceold    = do { low <- option (Sym (Const "any")) numericexpr; -- aggregat
 -- parse mycount "" "[  sat(C) : clause(C) ] k-1" 
 -- parse mycount "" "k [ lc(X, Y) : arc(X, Y, L) = L ]"
 -- parse mycount "" "k [ lc(X, Y) : arc(X, Y, L) = L]" -- OK
+-- parse mycount "" "k [ X : Y = L]" -- NOK
+-- parse mycount "" "min [ lc(X, Y) : arc(X, Y, L) = L ]"
+-- parse mycount "" "#max [ lc(X, Y) : arc(X, Y, L) = L ]"
 mycount :: GenParser Char st Body
 mycount    = do { low <- option (Sym (Const "any")) numericexpr; -- aggregateconst;
                    content <- 
@@ -503,6 +562,24 @@ mycount    = do { low <- option (Sym (Const "any")) numericexpr; -- aggregatecon
                          return (Count low high content True)}
 
 
+-- parse myoptimize "" "k [ X : Y = L]" -- NOK
+-- parse myoptimize "" "min [ lc(X, Y) : arc(X, Y, L) = L ]"
+-- parse myoptimize "" "#max [ lc(X, Y) : arc(X, Y, L) = L ]"
+myoptimize :: GenParser Char st Body
+myoptimize    = do { minmax <- optstmt;
+                   content <- 
+                   between (skipMany1 (space <|> char '[' <|> space ))
+                           (skipMany1 ( space <|> char ']' <|> space)) 
+                           (sepBy rel (skipMany1 (space <|> char ',')));
+                         return (Optimize minmax content True)}
+
+optstmt :: GenParser Char st Bool
+optstmt = do {
+        try(do {string "#max"; return True}) <|>
+        try(do {string "max"; return True}) <|>
+        try(do {string "#min"; return False}) <|>
+        try(do {string "min"; return False}) 
+}
 
 
 -- anumber :: GenParser Char st String
@@ -647,8 +724,13 @@ atomm    = do { r <- atom; return (r,[])}
 -- parse genrel "" "not occurs(Y) : Y < X, vtx(X)" -- vtx should not be parsed 
 -- parse genrel "" "f : vtx(Y) : Y < X"
 -- parse genrel "" "person(a; b; c)"
+-- parse genrel "" "#max [ lc(X, Y) : arc(X, Y, L) = L ]"
+-- parse genrel "" "M = #min [ est(I,S) : est(I,S) : hasest(I) = S ]" -- NOK, but should be 
+-- parse genrel "" "not 1 { at(T,D,P) : peg(P) } 1"
 genrel :: GenParser Char st Body
 genrel    = 
+            try(myassign) <|> 
+            try(myoptimize) <|>
             try(mychoice) <|>
             try(mycount) <|>
             try(rel) <|> 
@@ -668,6 +750,7 @@ genrel    =
 -- parse body "" "not occurs(Y) : Y < X, vtx(X)" 
 -- parse body "" "occurs(X), not occurs(Y) : vtx(X) : Y < X, vtx(X)" 
 -- parse body "" "waitingfor(_,_)."
+-- parse body "" "M = #min [ est(I,S) : est(I,S) : hasest(I) = S ],\nN = #max [ est(J,T) : est(J,T) : hasest(J) = T ], sest(P), est."
 body :: GenParser Char st [Body]
 body    = do (sepBy genrel (skipMany1 (space <|> char ',')))
 
@@ -687,7 +770,9 @@ body    = do (sepBy genrel (skipMany1 (space <|> char ',')))
 
 -- parse rule "" "ready(A :- \"rdf:type\"(A,\"wp1:Activity\"), not missing_commit(A)." -- should fail
 -- parse rule "" "ready(A) :- \"rdf:type\" A,\"wp1:Activity\"), not missing_commit(A)." -- should fail
-             
+-- parse rule "" "time(M..N)     :- mintime(M), maxtime(N)." -- OK
+-- parse rule "" "ests(M..N+P) :- M = #min [ est(I,S) : est(I,S) : hasest(I) = S ],\nN = #max [ est(J,T) : est(J,T) : hasest(J) = T ], sest(P), est." -- OK
+-- parse rule "" "dist(#abs(RK1-RK2)) :- restaurant(RN1,RK1), restaurant(RN2,RK2)." -- NOK
 rule :: GenParser Char st Rules    
 rule    = do { 
                n <- genrel; 
@@ -860,6 +945,10 @@ constdef    = do {
                e <- numericexpr;
                char '.'; 
                return (Consts [(Assign nm e)]) }
+
+lefthand :: GenParser Char st Atom
+lefthand = try(do {(a,_) <- atomm; return a}) <|> -- (Atom,[MyExpr])
+           try(variable) 
 
 -- parse mindef "" "minimize [a1,a2]."
 -- parse mindef "" "minimize [a1 =5,a2=6,a3]."

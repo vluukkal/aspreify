@@ -118,6 +118,8 @@ factitem id ctr i accu =
                 -- ""
       Show l -> accu 
       Hide l -> accu 
+      GShow l -> accu 
+      GHide l -> accu 
       External l -> accu 
       Function l -> accu 
       Minimize l -> accu 
@@ -226,6 +228,16 @@ factbody rel parentid ctr r accu =
                              "maxcount(" ++ show(factid) ++ "," ++  show(maxexprid) ++ ").\n" ++ 
                                        (unfactmyexpr max maxexprid ctr))
                        ]
+    Optimize minmax b nonneg -> let myrel = (if rel == "" then "head" else rel)
+                        in 
+                          accu ++ 
+                       [(if nonneg then "" else "not ") ++ 
+                         myrel ++ "(" ++ show(parentid) ++ "," ++ show(factid) ++ ").\n" ++
+                         (if minmax == True then "optimize(" ++ show(factid) ++ ", max).\n" 
+                                            else "optimize(" ++ show(factid) ++ ", min).\n") ++ 
+                        (List.foldr (++) "" 
+                         (let (content,localid) = (List.foldr (factcard' "body" factid ctr) ([],0) b) in content)) 
+                       ]
     Typed b -> let myrel = (if rel == "" then "head" else rel)
                         in 
                    accu ++ -- ["YYYTyped\n"] ++ 
@@ -241,14 +253,16 @@ factbody rel parentid ctr r accu =
                       ))
                       --}
                    ] 
-    Weighed e1 b1 -> -- let wid = (myrand())::Int in
+    Weighed e1 b1 nonneg -> -- let wid = (myrand())::Int in
                      -- let eid = (myrand())::Int in
                      let wid = FactRender.getnext(ctr) in
                      let eid = FactRender.getnext(ctr) in
                      let myrel = (if rel == "" then "head" else rel)
                      in 
                      accu ++ -- ["YYYWeighed\n"] ++ 
-                     [myrel ++ "(" ++ show(parentid) ++ "," ++ show(factid) ++ ").\n" ++
+                     [ (if nonneg then ("pos(" ++ show(parentid) ++ ").\n")
+                        else ("neg(" ++ show(parentid) ++ ").\n")) ++
+                        myrel ++ "(" ++ show(parentid) ++ "," ++ show(factid) ++ ").\n" ++
                         (List.foldr (++) "" 
                          -- (let (content,localid) = (List.foldr (factcount "body" factid ctr) ([],0) b1) in content)) 
                          (let (content,localid) = (List.foldr (factcount "body" factid ctr) ([],0) [b1]) in content)) 
@@ -283,6 +297,20 @@ factbody rel parentid ctr r accu =
            (unfactmyexpr e eid ctr)
            ]
     -- Empty -> accu ++ [" NONE "]
+    Assignment nm e nonneg -> 
+           let nid = FactRender.getnext(ctr) in
+           let eid = FactRender.getnext(ctr) in
+           accu ++ 
+           [
+           (if nonneg then ("pos(" ++ show(parentid) ++ ").\n")
+                           else ("neg(" ++ show(parentid) ++ ").\n")) ++
+           "lefthand(" ++ show(parentid) ++ "," ++ show(nid) ++ ").\n" ++ 
+           "value(" ++ show(parentid) ++ "," ++ show(eid) ++ ").\n" ++ 
+           (unfactcatom nm nid) ++ 
+           (let (content,localid) = (List.foldr (factcard' "body" eid ctr) ([],0) [e]) in List.head (content))
+           -- (factbody "body" eid ctr)
+           -- (unfactmyexpr e eid ctr)
+           ]
     Empty -> accu 
     Arity a n -> accu
 
