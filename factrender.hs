@@ -277,10 +277,10 @@ factbody rel parentid ctr r accu =
                       let rid = FactRender.getnext(ctr) in
               accu ++ 
               [-- show (factid) ++ "). %X5\n" ++ 
-              "bexpr(" ++ show (factid) ++ ").\n" ++ 
+              "bexpr(" ++ show(parentid) ++ "," ++ show (factid) ++ ").\n" ++ 
               "bop(" ++ show (factid) ++ "," ++ "\"" ++ (unbop op) ++ "\"" ++ ").\n" ++ 
-              "larg(" ++ show(factid) ++ "," ++ show(lid) ++ ")." ++ (unfactmyexpr b1 lid ctr) ++ 
-              "rarg(" ++ show(factid) ++ "," ++ show(lid) ++ ")." ++ (unfactmyexpr b2 rid ctr)  ]
+              "larg(" ++ show(factid) ++ "," ++ show(lid) ++ ").\n" ++ (unfactmyexpr b1 lid ctr) ++ 
+              "rarg(" ++ show(factid) ++ "," ++ show(rid) ++ ").\n" ++ (unfactmyexpr b2 rid ctr)  ]
               
               --- show (factid) ++ ",http://m3.org/rls#bop,\"" ++ (unbop op) ++ "\"\n" ++ 
               --- show (factid) ++ ",http://m3.org/rls#left," ++ (unrdfmyexpr b1 lid ) ++ 
@@ -375,15 +375,15 @@ unfactarith op a1 a2 exprid ctr =
     let rid = FactRender.getnext(ctr) in
     -- show(exprid) ++ "). % X1\n" ++ 
     "arithexpr(" ++ show (exprid) ++ ").\n" ++ 
-    "op(" ++ show (exprid) ++ "," ++ "\"" ++ (unop op)  ++ "\"" ++ ")." ++ 
+    "op(" ++ show (exprid) ++ "," ++ "\"" ++ (unop op)  ++ "\"" ++ ").\n" ++ 
     -- show (exprid) ++ ",rdf:type,http://m3.org/rls#arithexpr\n" ++ 
     -- show (exprid) ++ ",http://m3.org/rls#op,\"" ++ (unop op) ++ "\"\n" ++ 
     -- Perhaps we should have the order here explicitely rather than just lines?
     -- The same mechanism as tlist could work here 
     -- "arg(" ++ show(exprid) ++ "," ++ (unfactmyexpr a1 lid ctr) ++ "). % Y2\n" ++ 
     -- "arg(" ++ show(exprid) ++ "," ++ (unfactmyexpr a2 rid ctr) ++ "). % Y1\n" 
-    "larg(" ++ show(exprid) ++ "," ++ show(lid) ++ ")." ++ (unfactmyexpr a1 lid ctr) ++ 
-    "rarg(" ++ show(exprid) ++ "," ++ show(rid) ++ ")." ++ (unfactmyexpr a2 rid ctr) 
+    "larg(" ++ show(exprid) ++ "," ++ show(lid) ++ ").\n" ++ (unfactmyexpr a1 lid ctr) ++ 
+    "rarg(" ++ show(exprid) ++ "," ++ show(rid) ++ ").\n" ++ (unfactmyexpr a2 rid ctr) 
 
 unfactmyexpr a exprid ctr = 
     case a of 
