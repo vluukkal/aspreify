@@ -68,21 +68,24 @@ txtbody' r accu =
                         [(if nonneg then "" else "not ") ++ 
                        unatom(n) ++ txtargs a]
     Card min max b nonneg -> accu ++ 
-                             [(if min == (Sym (Const "any")) then "" else (unmyexpr(min) ++ " ")) ++ 
+                             [(if nonneg then "" else "not ") ++ 
+                             (if min == (Sym (Const "any")) then "" else (unmyexpr(min) ++ " ")) ++ 
                              "{" ++ 
                               -- (head(txtbody' b [])) ++ 
                               L.unwords((L.intersperse "," (L.foldr txtbody' [] b))) ++ 
                               "}" ++
                             (if max == (Sym (Const "any")) then "" else (" " ++ unmyexpr(max)))]
     Count min max b nonneg -> accu ++ 
-                             [(if min == (Sym (Const "any")) then "" else (unmyexpr(min) ++ " ")) ++ 
+                             [(if nonneg then "" else "not ") ++ 
+                             (if min == (Sym (Const "any")) then "" else (unmyexpr(min) ++ " ")) ++ 
                              "[" ++ 
                               -- (head(txtbody' b [])) ++ 
                               L.unwords((L.intersperse "," (L.foldr txtbody' [] b))) ++ 
                               "]" ++
                             (if max == (Sym (Const "any")) then "" else (" " ++ unmyexpr(max)))]
     Optimize opt b nonneg -> accu ++ 
-                             [(if opt == True then "#max" else "#min") ++ 
+                             [(if nonneg then "" else "not ") ++ 
+                              (if opt == True then "#max" else "#min") ++ 
                              "[" ++ 
                               -- (head(txtbody' b [])) ++ 
                               L.unwords((L.intersperse "," (L.foldr txtbody' [] b))) ++ 

@@ -157,7 +157,8 @@ trule1 = TestCase $ assertEqual "rule 1" (Rule (Plain (Const "blub") [Sym (Var "
 
 trule2 = TestCase $ assertEqual "rule 2" (Rule (Plain (Const "blub") [Sym (Var "Foo"),Sym (Var "Bar"),Sym (Var "Goo")] True) [Plain (Const "blab") [Sym (Var "Baa")] True,Plain (Const "bii") [] True]) (wrapparser rule "" "blub(Foo,Bar,Goo) :-  blab(Baa),\n bii.")
 
-trule3 = TestCase $ assertEqual "rule 3" (Rule (Plain (Const "ok") [] True) [Count (Sym (Const "k")) (Sym (Const "any")) [Typed [Plain (Const "lc") [Sym (Var "X"),Sym (Var "Y")] True,Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True)]] True]) (wrapparser rule "" "ok :- k [ lc(X, Y) : arc(X, Y, L) = L ] .")
+-- trule3 = TestCase $ assertEqual "rule 3" (Rule (Plain (Const "ok") [] True) [Count (Sym (Const "k")) (Sym (Const "any")) [Typed [Plain (Const "lc") [Sym (Var "X"),Sym (Var "Y")] True,Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True)]] True]) (wrapparser rule "" "ok :- k [ lc(X, Y) : arc(X, Y, L) = L ] .")
+trule3 = TestCase $ assertEqual "rule 3" (Rule (Plain (Const "ok") [] True) [Count (Sym (Const "k")) (Sym (Const "any")) [Typed [Plain (Const "lc") [Sym (Var "X"),Sym (Var "Y")] True,Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True) True]] True]) (wrapparser rule "" "ok :- k [ lc(X, Y) : arc(X, Y, L) = L ] .")
 
 trule4 = TestCase $ assertEqual "rule 4" (Rule (Plain (Const "initial") [Sym (Var "X")] True) [Plain (Const "occurs") [Sym (Var "X")] True,Typed [Plain (Const "occurs") [Sym (Var "Y")] False,BExpr Lt (Sym (Var "Y")) (Sym (Var "X"))],Plain (Const "vtx") [Sym (Var "X")] True]) (wrapparser rule "" "initial(X) :- occurs(X), not occurs(Y) : Y < X, vtx(X).")
 
@@ -202,6 +203,8 @@ tbody7 = TestCase $ assertEqual "body 7" [Plain (Const "occurs") [Sym (Var "X")]
 
 tbody8 = TestCase $ assertEqual "body 8" [Plain (Const "waitingfor") [Sym (Var "_"),Sym (Var "_")] True] (wrapparser_bl body "" "waitingfor(_,_).")
 
+tbody9 = TestCase $ assertEqual "body 9" [Assignment (Var "M") (Optimize False [Typed [Plain (Const "est") [Sym (Var "I"),Sym (Var "S")] True,Plain (Const "est") [Sym (Var "I"),Sym (Var "S")] True,Weighed (Sym (Var "S")) (Plain (Const "hasest") [Sym (Var "I")] True) True]] True) True,Assignment (Var "N") (Optimize True [Typed [Plain (Const "est") [Sym (Var "J"),Sym (Var "T")] True,Plain (Const "est") [Sym (Var "J"),Sym (Var "T")] True,Weighed (Sym (Var "T")) (Plain (Const "hasest") [Sym (Var "J")] True) True]] True) True,Plain (Const "sest") [Sym (Var "P")] True,Plain (Const "est") [] True] (wrapparser_bl body "" "M = #min [ est(I,S) : est(I,S) : hasest(I) = S ],\nN = #max [ est(J,T) : est(J,T) : hasest(J) = T ], sest(P), est.")
+
 -- tbody = TestCase $ assertEqual "body X"  (wrapparser_bl body "" "")
 
 tgenrel1 = TestCase $ assertEqual "genrel 1" (Plain (Const "blub") [] True) (wrapparser_bl' genrel "" "blub")
@@ -236,7 +239,8 @@ tgenrel14 = TestCase $ assertEqual "genrel 14" (Card (Sym (Const "any")) (Number
 
 tgenrel15 = TestCase $ assertEqual "genrel 15" (Card (Sym (Const "any")) (Sym (Const "any")) [Plain (Const "blub") [Sym (Var "Foo"),Sym (Const "\"Bar\""),Sym (Var "Goo")] True] True) (wrapparser_bl' genrel "" "{blub(Foo,\"Bar\",Goo)}")
 
-tgenrel16 = TestCase $ assertEqual "genrel 16"  (Count (Sym (Const "any")) (Sym (Const "any")) [Typed [Plain (Const "lc") [Sym (Var "X"),Sym (Var "Y")] True,Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True)]] True) (wrapparser_bl' genrel "" "[ lc(X, Y) : arc(X, Y, L) = L ]")
+-- tgenrel16 = TestCase $ assertEqual "genrel 16"  (Count (Sym (Const "any")) (Sym (Const "any")) [Typed [Plain (Const "lc") [Sym (Var "X"),Sym (Var "Y")] True,Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True)]] True) (wrapparser_bl' genrel "" "[ lc(X, Y) : arc(X, Y, L) = L ]")
+tgenrel16 = TestCase $ assertEqual "genrel 16"  (Count (Sym (Const "any")) (Sym (Const "any")) [Typed [Plain (Const "lc") [Sym (Var "X"),Sym (Var "Y")] True,Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True) True]] True) (wrapparser_bl' genrel "" "[ lc(X, Y) : arc(X, Y, L) = L ]")
 
 -- Note that the vtx should not be parsed
 tgenrel17 = TestCase $ assertEqual "genrel 17" (Typed [Plain (Const "occurs") [Sym (Var "Y")] False,BExpr Lt (Sym (Var "Y")) (Sym (Var "X"))]) (wrapparser_bl' genrel "" "not occurs(Y) : Y < X, vtx(X)")
@@ -245,6 +249,9 @@ tgenrel18 = TestCase $ assertEqual "genrel 18" (Typed [Plain (Const "f") [] True
 
 tgenrel19 = TestCase $ assertEqual "genrel 19" (Plain (Const "person") [Alternative [Sym (Const "a"),Sym (Const "b"),Sym (Const "c")]] True)  (wrapparser_bl' genrel "" "person(a; b; c)")
 
+tgenrel20 = TestCase $ assertEqual "genrel 20"  (Optimize True [Typed [Plain (Const "lc") [Sym (Var "X"),Sym (Var "Y")] True,Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True) True]] True) (wrapparser_bl' genrel "" "#max [ lc(X, Y) : arc(X, Y, L) = L ]")
+
+tgenrel21 = TestCase $ assertEqual "genrel 21" (Assignment (Var "M") (Optimize False [Typed [Plain (Const "est") [Sym (Var "I"),Sym (Var "S")] True,Plain (Const "est") [Sym (Var "I"),Sym (Var "S")] True,Weighed (Sym (Var "S")) (Plain (Const "hasest") [Sym (Var "I")] True) True]] True) True) (wrapparser_bl' genrel "" "M = #min [ est(I,S) : est(I,S) : hasest(I) = S ]")
 
 -- tgenrel = TestCase $ assertEqual "genrel X"  (wrapparser_bl' genrel "" "")
 
@@ -293,9 +300,10 @@ tmycount3 = TestCase $ assertEqual "mycount 3" (Count (Sym (Const "any")) (Sym (
 
 tmycount4 = TestCase $ assertEqual "mycount 4" (Count (Sym (Const "any")) (Arith Minus (Sym (Const "k")) (Number (Const "1"))) [Typed [Plain (Const "sat") [Sym (Var "C")] True,Plain (Const "clause") [Sym (Var "C")] True]] True) (wrapparser_bl' mycount "" "[  sat(C) : clause(C) ] k-1")
 
-tmycount5 = TestCase $ assertEqual "mycount 5" (Count (Sym (Const "k")) (Sym (Const "any")) [Typed [Plain (Const "lc") [Sym (Var "X"),Sym (Var "Y")] True,Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True)]] True) (wrapparser_bl' mycount "" "k [ lc(X, Y) : arc(X, Y, L) = L ]")
+-- tmycount5 = TestCase $ assertEqual "mycount 5" (Count (Sym (Const "k")) (Sym (Const "any")) [Typed [Plain (Const "lc") [Sym (Var "X"),Sym (Var "Y")] True,Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True)]] True) (wrapparser_bl' mycount "" "k [ lc(X, Y) : arc(X, Y, L) = L ]")
+tmycount5 = TestCase $ assertEqual "mycount 5" (Count (Sym (Const "k")) (Sym (Const "any")) [Typed [Plain (Const "lc") [Sym (Var "X"),Sym (Var "Y")] True,Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True) True]] True) (wrapparser_bl' mycount "" "k [ lc(X, Y) : arc(X, Y, L) = L ]")
 
-tmycount6 = TestCase $ assertEqual "mycount 6" (Count (Sym (Const "k")) (Sym (Const "any")) [Typed [Plain (Const "lc") [Sym (Var "X"),Sym (Var "Y")] True,Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True)]] True) (wrapparser_bl' mycount "" "k [ lc(X, Y) : arc(X, Y, L) = L]")
+tmycount6 = TestCase $ assertEqual "mycount 6" (Count (Sym (Const "k")) (Sym (Const "any")) [Typed [Plain (Const "lc") [Sym (Var "X"),Sym (Var "Y")] True,Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True) False]] True) (wrapparser_bl' mycount "" "k [ lc(X, Y) : not arc(X, Y, L) = L]")
 
 -- tmycount = TestCase $ assertEqual "mycount X"  (wrapparser_bl' mycount "" "")
 
@@ -322,11 +330,13 @@ tmychoice9 = TestCase $ assertEqual "mychoice 9" Empty (wrapparser_bl' mychoice 
 -- Note that the latter "no" is not parsed 
 trel1 = TestCase $ assertEqual "rel 1" (Plain (Const "blub") [Sym (Var "Foo"),Sym (Var "Bar"),Sym (Var "Goo")] True) (wrapparser_bl' rel "" "blub(Foo,Bar,Goo),\"no\"")
 
-trel2 = TestCase $ assertEqual "rel 2" (Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True)) (wrapparser_bl' rel "" "arc(X, Y, L) = L")
+-- trel2 = TestCase $ assertEqual "rel 2" (Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True)) (wrapparser_bl' rel "" "arc(X, Y, L) = L")
+trel2 = TestCase $ assertEqual "rel 2" (Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True) True) (wrapparser_bl' rel "" "arc(X, Y, L) = L")
 
 trel3 = TestCase $ assertEqual "rel 3" (Typed [Plain (Const "lc") [Sym (Var "X"),Sym (Var "Y")] True,Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True]) (wrapparser_bl' rel "" "lc(X,Y) : arc(X, Y, L)")
 
-trel4 = TestCase $ assertEqual "rel 4" (Typed [Plain (Const "lc") [Sym (Var "X"),Sym (Var "Y")] True,Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True)]) (wrapparser_bl' rel "" "lc(X,Y) : arc(X, Y, L) = L")
+-- trel4 = TestCase $ assertEqual "rel 4" (Typed [Plain (Const "lc") [Sym (Var "X"),Sym (Var "Y")] True,Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True)]) (wrapparser_bl' rel "" "lc(X,Y) : arc(X, Y, L) = L")
+trel4 = TestCase $ assertEqual "rel 4" (Typed [Plain (Const "lc") [Sym (Var "X"),Sym (Var "Y")] True,Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True) True]) (wrapparser_bl' rel "" "lc(X,Y) : arc(X, Y, L) = L")
 
 trel5 = TestCase $ assertEqual "rel 5" (Plain (Const "blub") [Sym (Var "Foo"),Sym (Var "Bar"),Sym (Var "Goo")] True) (wrapparser_bl' rel "" "blub(Foo,Bar,Goo)")
 
@@ -337,13 +347,16 @@ trel7 = TestCase $ assertEqual "rel 7" (Plain (Const "r") [] True) (wrapparser_b
 
 trel8 = TestCase $ assertEqual "rel 8" (Plain (Const "r") [] False) (wrapparser_bl' rel "" "not r, s, not t")
 
+trel9 = TestCase $ assertEqual "rel 9" (Typed [Plain (Const "ttask") [Sym (Var "I"),Sym (Var "D")] True,Plain (Const "ttask") [Sym (Var "I"),Sym (Var "D")] True,Plain (Const "haslet") [Sym (Var "I")] False,Weighed (Sym (Var "D")) (Plain (Const "tsklet") [Sym (Var "I")] True) False]) (wrapparser_bl' rel "" "ttask(I,D) : ttask(I,D) : not haslet(I) : not tsklet(I) = D")
+
 -- trel = TestCase $ assertEqual "rel X"  (wrapparser_bl' rel "" "")
 
 ttrel1 = TestCase $ assertEqual "trel 1" (Typed [Plain (Const "arc_S") [Sym (Var "X"),Sym (Var "Y")] True,Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y")] True]) (wrapparser_bl' trel "" "arc_S(X, Y) : arc(X, Y)")
 
 ttrel2 = TestCase $ assertEqual "trel 2" (Typed [Plain (Const "arc_S") [Sym (Var "X"),Sym (Var "Y")] False,Plain (Const "arc") [Sym (Var "X"),Sym (Var "Yo")] True]) (wrapparser_bl' trel "" "not arc_S(X, Y) : arc(X, Yo)")
 
-ttrel3 = TestCase $ assertEqual "trel 3" (Typed [Plain (Const "lc") [Sym (Var "X"),Sym (Var "Y")] True,Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True)]) (wrapparser_bl' trel "" "lc(X, Y) : arc(X, Y, L) = L")
+-- ttrel3 = TestCase $ assertEqual "trel 3" (Typed [Plain (Const "lc") [Sym (Var "X"),Sym (Var "Y")] True,Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True)]) (wrapparser_bl' trel "" "lc(X, Y) : arc(X, Y, L) = L")
+ttrel3 = TestCase $ assertEqual "trel 3" (Typed [Plain (Const "lc") [Sym (Var "X"),Sym (Var "Y")] True,Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True) True]) (wrapparser_bl' trel "" "lc(X, Y) : arc(X, Y, L) = L")
 
 ttrel4 = TestCase $ assertEqual "trel 4" (Typed [Plain (Const "occurs") [Sym (Var "Y")] False,Plain (Const "vtx") [Sym (Var "X")] True,BExpr Lt (Sym (Var "Y")) (Sym (Var "X"))]) (wrapparser_bl' trel "" "not occurs(Y) : vtx(X) : Y < X")
 
@@ -375,7 +388,10 @@ tsrel4 = TestCase $ assertEqual "srel 4"  (Plain (Const "blub") [Sym (Var "Foo")
 
 -- tsrel = TestCase $ assertEqual "srel X"  (wrapparser_bl' srel "" "")
 
-twrel1 = TestCase $ assertEqual "wrel 1" (Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True)) (wrapparser_bl' wrel "" "arc(X, Y, L) = L")
+-- twrel1 = TestCase $ assertEqual "wrel 1" (Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True)) (wrapparser_bl' wrel "" "arc(X, Y, L) = L")
+twrel1 = TestCase $ assertEqual "wrel 1" (Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True) True) (wrapparser_bl' wrel "" "arc(X, Y, L) = L")
+
+twrel2 = TestCase $ assertEqual "wrel 2" (Weighed (Arith Range (Number (Const "1")) (Sym (Var "L"))) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True) True) (wrapparser_bl' wrel "" "arc(X, Y, L) = 1..L")
 
 -- twrel = TestCase $ assertEqual "wrel X"  (wrapparser_bl' wrel "" "")
 
@@ -383,9 +399,16 @@ tnegrel1 = TestCase $ assertEqual "negrel 1" (Plain (Const "blub") [Sym (Var "Fo
 
 -- tnegrel = TestCase $ assertEqual "negrel X"  (wrapparser_bl' negrel "" "")
 
-tarel1 = TestCase $ assertEqual "arel X"  (Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True)) (wrapparser_bl' arel "" "arc(X, Y, L) = L")
+-- tarel1 = TestCase $ assertEqual "arel X"  (Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True)) (wrapparser_bl' arel "" "arc(X, Y, L) = L")
+tarel1 = TestCase $ assertEqual "arel X" (Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True) True)  (wrapparser_bl' arel "" "arc(X, Y, L) = L")
 
 -- tarel = TestCase $ assertEqual "arel X"  (wrapparser_bl' arel "" "")
+
+tarel''1 = TestCase $ assertEqual "arel'' 1" (Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True) False)  (wrapparser_bl' arel'' "" "not arc(X, Y, L) = L")
+
+tarel''2 = TestCase $ assertEqual "arel'' 2" Empty  (wrapparser_bl' arel'' "" "not M = [ est(I,S) : est(I,S) : hasest(I) = S ]")
+
+-- tarel'' = TestCase $ assertEqual "arel'' X"  (wrapparser_bl' arel'' "" "")
 
 targs1 = TestCase $ assertEqual "args 1" [Sym (Var "Foo"),Sym (Var "Bar"),Sym (Var "Goo")]  (wrapparser_exp' args "" "(Foo, Bar, Goo)")
 
@@ -483,9 +506,33 @@ taltexpr3 = TestCase $ assertEqual "altexpr 3"  (Alternative [Sym (Const "f"),Sy
 taltexpr4 = TestCase $ assertEqual "altexpr 4"  (Alternative [Sym (Const "f"),Sym (Const "g"),Sym (Const "x"),Sym (Const "y"),Sym (Var "Z")]) (wrapparser_exp altexpr "" "f ;g;x;y;Z")
 
 taltexpr5 = TestCase $ assertEqual "altexpr 5" (Alternative [Sym (Var "Foo"),Sym (Var "Bar")]) (wrapparser_exp altexpr "" "Foo;Bar")
-
+ 
 -- taltexpr = TestCase $ assertEqual "altexpr X"  (wrapparser_expr altexpr "" "")
 
+tshoworhide1 = TestCase $ assertEqual "showorhide 1" (Show [Plain (Const "waitingfor") [Sym (Var "_"),Sym (Var "_")] True]) (wrapparser showorhide "" "show waitingfor(_,_).")
+
+tshoworhide2 = TestCase $ assertEqual "showorhide 2" (GShow [Plain (Const "waitingfor") [Sym (Var "_"),Sym (Var "_")] True]) (wrapparser showorhide "" "#show waitingfor(_,_).")
+
+tshoworhide3 = TestCase $ assertEqual "showorhide 3" (GHide [Plain (Const "waitingfor") [Sym (Var "_"),Sym (Var "_")] True]) (wrapparser showorhide "" "#hide waitingfor(_,_).")
+
+tshoworhide4 = TestCase $ assertEqual "showorhide 4" (GHide [Empty]) (wrapparser showorhide "" "#hide.")
+
+tshoworhide5 = TestCase $ assertEqual "showorhide 5" (GHide [Arity (Const "pos") "3"]) (wrapparser showorhide "" "#hide pos/3.")
+tshoworhide6 = TestCase $ assertEqual "showorhide 6" (GShow [Arity (Const "pos") "3"]) (wrapparser showorhide "" "#show pos/3.")
+
+-- tshoworhide = TestCase $ assertEqual "showorhide X"  (wrapparser showorhide "" "")
+
+tmyassign1 = TestCase $ assertEqual "myassign 1"  (Assignment (Var "M") (Optimize False [Typed [Plain (Const "est") [Sym (Var "I"),Sym (Var "S")] True,Plain (Const "est") [Sym (Var "I"),Sym (Var "S")] True,Weighed (Sym (Var "S")) (Plain (Const "hasest") [Sym (Var "I")] True) True]] True) True) (wrapparser_bl' myassign "" "M = #min [ est(I,S) : est(I,S) : hasest(I) = S ]")
+
+tmyassign2 = TestCase $ assertEqual "myassign 2" (Assignment (Var "M") (Count (Sym (Const "any")) (Sym (Const "any")) [Typed [Plain (Const "est") [Sym (Var "I"),Sym (Var "S")] True,Plain (Const "est") [Sym (Var "I"),Sym (Var "S")] True,Weighed (Sym (Var "S")) (Plain (Const "hasest") [Sym (Var "I")] True) True]] True) True) (wrapparser_bl' myassign "" "M = [ est(I,S) : est(I,S) : hasest(I) = S ]")
+
+-- tmyassign = TestCase $ assertEqual "myassign X"  (wrapparser_bl' myassign "" "")
+
+tmyoptimize1 = TestCase $ assertEqual "myoptimize 1" (Optimize True [Typed [Plain (Const "lc") [Sym (Var "X"),Sym (Var "Y")] True,Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True) True]] True)  (wrapparser_bl' myoptimize "" "#max [ lc(X, Y) : arc(X, Y, L) = L ]")
+
+tmyoptimize2 = TestCase $ assertEqual "myoptimize 2" (Optimize True [Typed [Plain (Const "lc") [Sym (Var "X"),Sym (Var "Y")] True,Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True) True]] True)  (wrapparser_bl' myoptimize "" "max [ lc(X, Y) : arc(X, Y, L) = L ]")
+
+-- tmyoptimize = TestCase $ assertEqual "myoptimize X"  (wrapparser_bl' myoptimize "" "")
 
 
 tests = TestList [ truleorfact1, truleorfact2, trulebase1, trulebase2, trulebase3, trulebase4,
@@ -494,10 +541,12 @@ tests = TestList [ truleorfact1, truleorfact2, trulebase1, trulebase2, trulebase
                     tfact1, tfact2,tdeny1, tdeny2, tdeny3, tdeny4, tdeny5, tdeny6,
                     trule1, trule2, trule3, trule4, trule5, trule6, trule7, trule8, trule9, 
                     trule10, trule11, trule12, trule13, trule14, trule15,
-                    tbody1,tbody2, tbody3, tbody4, tbody5, tbody6, tbody7, tbody8,
+                    tbody1,tbody2, tbody3, tbody4, tbody5, tbody6, tbody7, tbody8,tbody9,
                     tgenrel1, tgenrel2, tgenrel3, tgenrel4, tgenrel5, tgenrel6, tgenrel7, tgenrel8,
                     tgenrel9, tgenrel10, tgenrel11, tgenrel12, tgenrel13, tgenrel14, tgenrel15, 
-                    tgenrel16, tgenrel17, tgenrel18, tgenrel19,
+                    tgenrel16, tgenrel17, tgenrel18, tgenrel19, tgenrel20, tgenrel21,
+                    tarel1, 
+                    tarel''1, tarel''2,
                     tnumericexpr1, tnumericexpr2, tnumericexpr3,
                     tnumeric1 , tnumeric2, tnumeric3, tnumeric4, tnumeric5,
                     tnexpr1 , tnexpr2, tnexpr3, tnexpr4,
@@ -505,19 +554,21 @@ tests = TestList [ truleorfact1, truleorfact2, trulebase1, trulebase2, trulebase
                     tmycount1, tmycount2, tmycount3, tmycount4, tmycount5, tmycount6,
                     tmychoice1, tmychoice2, tmychoice3, tmychoice4, tmychoice5, tmychoice6,
                     tmychoice7, tmychoice8,tmychoice9,
-                    trel1, trel2,trel3,trel4,trel5,trel6,trel7,trel8,
+                    trel1, trel2,trel3,trel4,trel5,trel6,trel7,trel8,trel9, 
                     ttrel1, ttrel2,ttrel3,ttrel4,ttrel5,ttrel6,
                     tatomrel1, tatomrel2, tatomrel3,
                     tsrel1, tsrel2, tsrel3, tsrel4,
-                    twrel1, tnegrel1, tarel1,
+                    twrel1, twrel2, tnegrel1, tarel1,
                     targs1,targs2,targs3,targs4,targs5,targs6,targs7,targs8,targs9,
                     targs10,targs11,targs12,
                     tmyelem1, tmyelem2, tmyelem3, tmyelem4,
                     tatom1,tatom2,tatom3,tatom4,tatom5,tatom6,
                     tnvariable1, tnvariable2, tnvariable3,
-                    taltexpr1,taltexpr2,taltexpr3,taltexpr4,taltexpr5
+                    taltexpr1,taltexpr2,taltexpr3,taltexpr4,taltexpr5,
                     --taltrel1,taltrel2,taltrel3,taltrel4,taltrel5,taltrel6,taltrel7,
                     -- taltrel8,taltrel9,taltrel10,taltrel11
+                    tshoworhide1, tshoworhide2, tshoworhide3, tshoworhide4, tshoworhide5, tshoworhide6,
+                    tmyassign1, tmyassign2, tmyoptimize1, tmyoptimize2
                     ]
 
 -- runTestTT tests

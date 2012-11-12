@@ -510,8 +510,15 @@ myassign'' = do {
 -- parse mychoice "" "{ p, t, not x}" 
 -- parse mychoice "" "{ p, t, not x }" 
 -- parse mychoice "" "1 { p, not t t}"  --- error, as it should be 
+-- parse mychoice "" "not 1 { at(T,D,P) : peg(P) } 1"
 mychoice :: GenParser Char st Body
-mychoice    = do { low <- option (Sym (Const "any")) numericexpr; -- aggregateconst;
+mychoice = do {
+         try(mychoice') <|>
+         try(mychoice'')
+         }
+
+mychoice' :: GenParser Char st Body
+mychoice'    = do { low <- option (Sym (Const "any")) numericexpr; -- aggregateconst;
                    content <- 
                    between (lbrace)
                             -- (skipMany1 (space <|> char ')')) 
@@ -523,6 +530,15 @@ mychoice    = do { low <- option (Sym (Const "any")) numericexpr; -- aggregateco
 --                         return content}
                    high <- option (Sym (Const "any")) numericexpr; -- aggregateconst;
                          return (Card low high content True)}
+
+mychoice'' :: GenParser Char st Body
+mychoice''    = do { 
+                string "not"; 
+                skipMany1 space;
+                res <- mychoice';
+                return (negateabody res)
+               }
+
 
 mychoiceold :: GenParser Char st Body
 mychoiceold    = do { low <- option (Sym (Const "any")) numericexpr; -- aggregateconst;
@@ -550,7 +566,13 @@ mychoiceold    = do { low <- option (Sym (Const "any")) numericexpr; -- aggregat
 -- parse mycount "" "min [ lc(X, Y) : arc(X, Y, L) = L ]"
 -- parse mycount "" "#max [ lc(X, Y) : arc(X, Y, L) = L ]"
 mycount :: GenParser Char st Body
-mycount    = do { low <- option (Sym (Const "any")) numericexpr; -- aggregateconst;
+mycount    = do {
+                try(mycount') <|>
+                try(mycount'')
+                }
+
+mycount' :: GenParser Char st Body
+mycount'    = do { low <- option (Sym (Const "any")) numericexpr; -- aggregateconst;
                    content <- 
                    between (skipMany1 (space <|> char '[' <|> space ))
                             -- (skipMany1 (space <|> char ')')) 
@@ -560,6 +582,14 @@ mycount    = do { low <- option (Sym (Const "any")) numericexpr; -- aggregatecon
 --                         return content}
                    high <- option (Sym (Const "any")) numericexpr; -- aggregateconst;
                          return (Count low high content True)}
+
+mycount'' :: GenParser Char st Body
+mycount''    = do { 
+                string "not"; 
+                skipMany1 space;
+                res <- mycount';
+                return (negateabody res)
+               }
 
 
 -- parse myoptimize "" "k [ X : Y = L]" -- NOK

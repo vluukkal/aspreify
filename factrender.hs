@@ -189,7 +189,7 @@ factbody rel parentid ctr r accu =
     Card min max b nonneg -> let myrel = (if rel == "" then "head" else rel)
                         in 
                           accu ++ --- ["YYYCard\n"] ++ 
-                       [(if nonneg then "" else "not ") ++ 
+                       [(if nonneg then "" else ("neg(" ++ show(factid) ++ ").\n")) ++ 
                          myrel ++ "(" ++ show(parentid) ++ "," ++ show(factid) ++ ").\n" ++
                          "card(" ++ show(factid) ++ ").\n" ++ 
                         (List.foldr (++) "" 
@@ -210,7 +210,7 @@ factbody rel parentid ctr r accu =
     Count min max b nonneg -> let myrel = (if rel == "" then "head" else rel)
                         in 
                           accu ++ -- ["YYYCount\n"] ++ 
-                       [(if nonneg then "" else "not ") ++ 
+                       [(if nonneg then "" else ("neg(" ++ show(factid) ++ ").\n")) ++ 
                          myrel ++ "(" ++ show(parentid) ++ "," ++ show(factid) ++ ").\n" ++
                          "weigh(" ++ show(factid) ++ ").\n" ++ 
                         (List.foldr (++) "" 
@@ -231,7 +231,7 @@ factbody rel parentid ctr r accu =
     Optimize minmax b nonneg -> let myrel = (if rel == "" then "head" else rel)
                         in 
                           accu ++ 
-                       [(if nonneg then "" else "not ") ++ 
+                       [(if nonneg then "" else ("neg(" ++ show(factid) ++ ").\n")) ++ 
                          myrel ++ "(" ++ show(parentid) ++ "," ++ show(factid) ++ ").\n" ++
                          (if minmax == True then "optimize(" ++ show(factid) ++ ", max).\n" 
                                             else "optimize(" ++ show(factid) ++ ", min).\n") ++ 
