@@ -314,9 +314,13 @@ negrel    = do {
 -- weighed relation
 -- parse wrel "" "arc(X, Y, L) = L"
 -- parse wrel "" "arc(X, Y, L) = 1..L" -- OK
--- parse wrel "" "L = 1..X" -- NOK 
+-- parse wrel "" "L = 1..X"
 wrel :: GenParser Char st Body
-wrel    = do {
+wrel = try(wrel') <|> 
+       try(wrel'')
+
+wrel' :: GenParser Char st Body
+wrel'    = do {
             -- we could call here arel, but it blows the stack
             ;n <- atom; many space;
             ;myargs <- args
@@ -326,6 +330,11 @@ wrel    = do {
             ;weight <- numericexpr
             ;many space          
             ;return (Weighed weight (Plain n myargs True) True)}
+
+-- Here we (re)use myassign stuff from 
+-- weights. 
+wrel'' :: GenParser Char st Body
+wrel''    = myassign''''
 
 --
 -- simple relation 
@@ -365,6 +374,7 @@ negatomrel    = do {string "not"; many space; n <- atom
 -- parse trel "" "not occurs(Y) : vtx(X) : Y < X"
 -- parse trel "" "blub(Foo,Bar,Goo)" -- fails, not typed 
 -- parse trel "" "f : vtx(Y) : Y < X."
+-- parse trel "" "f : vtx(Y) : Y < X : L = X..Y."
 trel :: GenParser Char st Body
 trel    = do {one <- arel;
               skipMany1 (space <|> justcolon <|> space ); 
@@ -448,7 +458,6 @@ rel     =  try(trel) <|>
 
     
 
--- lbrace :: mychoice :: GenParser Char st Body
 -- lbrace :: GenParser Char st [Char]
 -- parse lbrace "" "{" 
 lbrace :: GenParser Char st ()
@@ -476,10 +485,12 @@ listsep = do {
 
 -- parse myassign "" "M = #min [ est(I,S) : est(I,S) : hasest(I) = S ]" 
 -- parse myassign "" "M = [ est(I,S) : est(I,S) : hasest(I) = S ]"
+-- parse myassign "" "M = { est(I,S) : est(I,S) : hasest(I) = S }"
 myassign :: GenParser Char st Body
 myassign = 
          try(myassign') <|>
-         try(myassign'') 
+         try(myassign'') <|> 
+         try(myassign''') 
 
 myassign' :: GenParser Char st Body
 myassign' = do {
@@ -490,6 +501,7 @@ myassign' = do {
          c <- myoptimize;
          return (Assignment lh c True)
 }
+
 myassign'' :: GenParser Char st Body
 myassign'' = do {
          lh <- lefthand;
@@ -498,6 +510,28 @@ myassign'' = do {
          skipMany space;
          c <- mycount;
          return (Assignment lh c True)
+}
+
+myassign''' :: GenParser Char st Body
+myassign''' = do {
+         lh <- lefthand;
+         skipMany space;
+         char '=';
+         skipMany space;
+         c <- mychoice;
+         return (Assignment lh c True)
+}
+
+-- For L=1..X
+-- parse myassign'''' "" "L = 1..X"
+myassign'''' :: GenParser Char st Body
+myassign'''' = do {
+         lh <- lefthand;
+         skipMany space;
+         char '=';
+         skipMany space;
+         c <- nexpr;
+         return (Assign lh c)
 }
 
 
@@ -718,6 +752,7 @@ numeric    =
 -- parse numericexpr "" "g;k"
 -- parse numericexpr "" "X;Y"
 -- parse numericexpr "" "X"
+-- parse numericexpr "" "1..X"
 numericexpr :: GenParser Char st MyExpr
 numericexpr = 
     try(nexpr) <|>
@@ -757,6 +792,8 @@ atomm    = do { r <- atom; return (r,[])}
 -- parse genrel "" "#max [ lc(X, Y) : arc(X, Y, L) = L ]"
 -- parse genrel "" "M = #min [ est(I,S) : est(I,S) : hasest(I) = S ]" -- NOK, but should be 
 -- parse genrel "" "not 1 { at(T,D,P) : peg(P) } 1"
+-- parse genrel "" "1 { pos(N,L,T) : L = 1..X : T = 1..Y } 1"
+-- parse genrel "" "foo(X..Y)"
 genrel :: GenParser Char st Body
 genrel    = 
             try(myassign) <|> 
@@ -781,6 +818,7 @@ genrel    =
 -- parse body "" "occurs(X), not occurs(Y) : vtx(X) : Y < X, vtx(X)" 
 -- parse body "" "waitingfor(_,_)."
 -- parse body "" "M = #min [ est(I,S) : est(I,S) : hasest(I) = S ],\nN = #max [ est(J,T) : est(J,T) : hasest(J) = T ], sest(P), est."
+-- parse body "" "L = { leaking(V) : leaking(V) }." -- NOK, returns []
 body :: GenParser Char st [Body]
 body    = do (sepBy genrel (skipMany1 (space <|> char ',')))
 
@@ -802,7 +840,8 @@ body    = do (sepBy genrel (skipMany1 (space <|> char ',')))
 -- parse rule "" "ready(A) :- \"rdf:type\" A,\"wp1:Activity\"), not missing_commit(A)." -- should fail
 -- parse rule "" "time(M..N)     :- mintime(M), maxtime(N)." -- OK
 -- parse rule "" "ests(M..N+P) :- M = #min [ est(I,S) : est(I,S) : hasest(I) = S ],\nN = #max [ est(J,T) : est(J,T) : hasest(J) = T ], sest(P), est." -- OK
--- parse rule "" "dist(#abs(RK1-RK2)) :- restaurant(RN1,RK1), restaurant(RN2,RK2)." -- NOK
+-- parse rule "" "dist(#abs(RK1-RK2)) :- restaurant(RN1,RK1), restaurant(RN2,RK2)." -- NOK, Abs
+-- parse rule "" "1 { pos(N,L,T) : L = 1..X : T = 1..Y } 1 :- net(N), layers(X), tracks(Y)." -- NOK
 rule :: GenParser Char st Rules    
 rule    = do { 
                n <- genrel; 

@@ -349,6 +349,8 @@ trel8 = TestCase $ assertEqual "rel 8" (Plain (Const "r") [] False) (wrapparser_
 
 trel9 = TestCase $ assertEqual "rel 9" (Typed [Plain (Const "ttask") [Sym (Var "I"),Sym (Var "D")] True,Plain (Const "ttask") [Sym (Var "I"),Sym (Var "D")] True,Plain (Const "haslet") [Sym (Var "I")] False,Weighed (Sym (Var "D")) (Plain (Const "tsklet") [Sym (Var "I")] True) False]) (wrapparser_bl' rel "" "ttask(I,D) : ttask(I,D) : not haslet(I) : not tsklet(I) = D")
 
+trel10 = TestCase $ assertEqual "rel 10" (Typed [Plain (Const "f") [] True,Plain (Const "vtx") [Sym (Var "Y")] True,BExpr Lt (Sym (Var "Y")) (Sym (Var "X")),Assign (Var "L") (Arith Range (Sym (Var "X")) (Sym (Var "Y")))]) (wrapparser_bl' rel "" "f : vtx(Y) : Y < X : L = X..Y.")
+
 -- trel = TestCase $ assertEqual "rel X"  (wrapparser_bl' rel "" "")
 
 ttrel1 = TestCase $ assertEqual "trel 1" (Typed [Plain (Const "arc_S") [Sym (Var "X"),Sym (Var "Y")] True,Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y")] True]) (wrapparser_bl' trel "" "arc_S(X, Y) : arc(X, Y)")
@@ -392,6 +394,8 @@ tsrel4 = TestCase $ assertEqual "srel 4"  (Plain (Const "blub") [Sym (Var "Foo")
 twrel1 = TestCase $ assertEqual "wrel 1" (Weighed (Sym (Var "L")) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True) True) (wrapparser_bl' wrel "" "arc(X, Y, L) = L")
 
 twrel2 = TestCase $ assertEqual "wrel 2" (Weighed (Arith Range (Number (Const "1")) (Sym (Var "L"))) (Plain (Const "arc") [Sym (Var "X"),Sym (Var "Y"),Sym (Var "L")] True) True) (wrapparser_bl' wrel "" "arc(X, Y, L) = 1..L")
+
+twrel3 = TestCase $ assertEqual "wrel 3" (Assign (Var "L") (Arith Range (Number (Const "1")) (Sym (Var "X")))) (wrapparser_bl' wrel "" "L = 1..X")
 
 -- twrel = TestCase $ assertEqual "wrel X"  (wrapparser_bl' wrel "" "")
 
@@ -554,11 +558,11 @@ tests = TestList [ truleorfact1, truleorfact2, trulebase1, trulebase2, trulebase
                     tmycount1, tmycount2, tmycount3, tmycount4, tmycount5, tmycount6,
                     tmychoice1, tmychoice2, tmychoice3, tmychoice4, tmychoice5, tmychoice6,
                     tmychoice7, tmychoice8,tmychoice9,
-                    trel1, trel2,trel3,trel4,trel5,trel6,trel7,trel8,trel9, 
+                    trel1, trel2,trel3,trel4,trel5,trel6,trel7,trel8,trel9, trel10, 
                     ttrel1, ttrel2,ttrel3,ttrel4,ttrel5,ttrel6,
                     tatomrel1, tatomrel2, tatomrel3,
                     tsrel1, tsrel2, tsrel3, tsrel4,
-                    twrel1, twrel2, tnegrel1, tarel1,
+                    twrel1, twrel2, twrel3, tnegrel1, tarel1,
                     targs1,targs2,targs3,targs4,targs5,targs6,targs7,targs8,targs9,
                     targs10,targs11,targs12,
                     tmyelem1, tmyelem2, tmyelem3, tmyelem4,
