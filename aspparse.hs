@@ -40,6 +40,7 @@ import System.Random
 import qualified Data.List as List
 import qualified Data.Map as Map
 import Text.ParserCombinators.Parsec
+import Text.ParserCombinators.Parsec.Expr
 
 import Data.IORef 
 
@@ -114,7 +115,7 @@ data MyExpr = Number Atom
 -- parse nvariable "" "X > Y"
 nvariable :: GenParser Char st Atom
 nvariable   = do{ c  <- upper
-                ; cs <- option "" (many (noneOf "\n\r\t (){[]},.=:;"))
+                ; cs <- option "" (many (noneOf "\n\r\t (){[]},.+-*/=:;"))
                 ; skipMany space
                 ; return (Var (c:cs))
                 }
@@ -203,6 +204,7 @@ myelem =
 -- parse args "" "(1 .. k)"
 -- parse args "" "(foo,Bar,5)"
 -- parse args "" "(foo,\"Bar\",5)"
+-- parse args "" "(X;X+1,Y)"
 args :: GenParser Char st [MyExpr]
 -- args    = do { cs <- between '(' ')' many (noneOf "\n\r\t ()")
 --               ; return cs}
@@ -313,6 +315,7 @@ negrel    = do {
 
 -- weighed relation
 -- parse wrel "" "arc(X, Y, L) = L"
+-- parse wrel "" "arc(X, Y, L) = L+1"
 -- parse wrel "" "arc(X, Y, L) = 1..L" -- OK
 -- parse wrel "" "L = 1..X"
 wrel :: GenParser Char st Body
@@ -375,10 +378,12 @@ negatomrel    = do {string "not"; many space; n <- atom
 -- parse trel "" "blub(Foo,Bar,Goo)" -- fails, not typed 
 -- parse trel "" "f : vtx(Y) : Y < X."
 -- parse trel "" "f : vtx(Y) : Y < X : L = X..Y."
+-- parse trel "" "forth(J,NI+1,S-M) :" -- nok
+-- parse trel "" "forth(J,NI+1,S-M) :-" -- nok
 trel :: GenParser Char st Body
 trel    = do {one <- arel;
               skipMany1 (space <|> justcolon <|> space ); 
-              rest <- (sepBy arel (skipMany1 (space <|> justcolon)));              
+              rest <- (sepBy1 arel (skipMany1 (space <|> justcolon)));              
               -- the above forces that there is at least        
               -- two entries for the list of types.       
               return (Typed (one:rest))
@@ -397,14 +402,17 @@ trel    = do {one <- arel;
 -- parse altexpr "" "lc(X, Y) ; arc(X, Y, L) = L" -- NOK
 -- parse altexpr "" "not occurs(Y) ; vtx(X) ; Y < X" -- NOK
 -- parse altexpr "" "f ; vtx(Y) ; Y < X." -- NOK
--- parse altexpr "" "blub(Foo;Bar,Bar;Foo,Goo;Moo)" -- NOK, as it should be 
+-- parse altexpr "" "blub(Foo;Bar,Bar;Foo,Goo;Moo)" -- NOK, as it should be -- loops
 -- altrel :: GenParser Char st Body -- added 
 altexpr :: GenParser Char st MyExpr 
 altexpr    = do { -- one <- numericexpr; -- this will diverge
-              one <- numeric;
+              -- one <- numeric;
+              -- one <- numericexpr; -- loops
+              one <- expr; -- loops
               skipMany1 (space <|> char ';' <|> space ); 
               -- rest <- (sepBy numericexpr (skipMany1 (space <|> char ';')));              
-              rest <- (sepBy numeric (skipMany1 (space <|> char ';')));              
+              -- rest <- (sepBy numeric (skipMany1 (space <|> char ';')));              
+              rest <- (sepBy expr (skipMany1 (space <|> char ';')));              
               -- the above forces that there is at least        
               -- two entries for the list of types.       
               return (Alternative (one:rest))
@@ -446,6 +454,7 @@ justcolon = do {
 -- parse rel "" "r, s, not t" -- only the 1st one is handled
 -- parse rel "" "not r, s, not t" -- only the 1st one is handled
 -- parse rel "" "ttask(I,D) : ttask(I,D) : not haslet(I) : not tsklet(I) = D"
+-- parse rel "" "field(X;X+1,Y)" -- NOK, wont parse the arguments 
 rel :: GenParser Char st Body
 {--
 rel     = try(negrel) <|>
@@ -545,6 +554,8 @@ myassign'''' = do {
 -- parse mychoice "" "{ p, t, not x }" 
 -- parse mychoice "" "1 { p, not t t}"  --- error, as it should be 
 -- parse mychoice "" "not 1 { at(T,D,P) : peg(P) } 1"
+-- parse mychoice "" "{  sat(C) : clause(C) } k-1"
+-- parse mychoice "" "{  sat(C) : clause(C) } k*(1/X)"
 mychoice :: GenParser Char st Body
 mychoice = do {
          try(mychoice') <|>
@@ -683,11 +694,13 @@ mybop    =
 -- parse bexpr "" "X < Y" -- OK degree-bounded_connected_subgraph.lp
 bexpr :: GenParser Char st Body
 bexpr = do { 
-              a1 <- numeric; 
+              -- a1 <- numeric; 
+              a1 <- numericexpr; 
               skipMany space; 
               o <- mybop;
               skipMany space; 
-              a2 <- numeric; 
+              -- a2 <- numeric; 
+              a2 <- numericexpr; 
               return (BExpr o a1 a2)
         }
 
@@ -700,8 +713,9 @@ myop    =
     try(do {c <- char '*'; return Mult}) <|>
     try(do {c <- char '/'; return Div}) <|>
     try(do {c <- string ".."; return Range}) <|>
-    try(do {s <- string "mod"; return Mod})
-           <?> "Expected an arithmetic operation: +,-,*,/,mod"
+    try(do {s <- string "mod"; return Mod}) <|>
+    try(do {s <- string "#mod"; return Mod})
+           <?> "Expected an arithmetic operation: +,-,*,/,mod,#mod"
 
 -- Urgh, here we are limiting to two-op expressions.
 -- Use the dedicated inbuilt expr parser?
@@ -709,6 +723,7 @@ myop    =
 -- parse nexpr "" "k + 2 + Z" -- will not parse Z
 -- parse nexpr "" "k + Z"
 -- parse nexpr "" "k + + Z" -- parse error
+-- Maybe replacement nexpr to expr will now work. 
 nexpr :: GenParser Char st MyExpr
 nexpr = do { 
               -- a1 <- numericexpr; 
@@ -744,21 +759,74 @@ numeric    =
     try(do { n <- atomquoted; return (Sym n) })
     <?> "A variable, atom or number"
 
-
 -- parse numericexpr "" "k + 2"
+-- parse numericexpr "" "k + 2 * Z"
+-- parse numericexpr "" "(k + 2) * Z"
+-- parse numericexpr "" "(k mod 2) / Z"
+-- parse numericexpr "" "(k mod \"jopi\") / (Z)"
 -- parse numericexpr "" "k"
 -- parse numericexpr "" "1"
 -- parse numericexpr "" "1;2"
 -- parse numericexpr "" "g;k"
+-- parse numericexpr "" "X;Y;k;1"
+-- parse numericexpr "" "g/2;k+1" -- Only parses the first g/2
 -- parse numericexpr "" "X;Y"
 -- parse numericexpr "" "X"
+-- parse numericexpr "" "X+1"
 -- parse numericexpr "" "1..X"
 numericexpr :: GenParser Char st MyExpr
 numericexpr = 
-    try(nexpr) <|>
+    -- try(nexpr) <|>
     try (altexpr) <|> -- added 
+    try(expr) <|>
     try(numeric)
     <?> "A numeric expression"
+
+-- This uses the parsec purpose-built expression parser 
+expr :: GenParser Char st MyExpr 
+expr    = buildExpressionParser table factor
+        <?> "expression"
+
+table   = [[  -- Infix (do{string "*" >> return (Op Times)}) AssocLeft
+              op "*" Mult AssocLeft
+            , op "/" Div AssocLeft
+            , op ".." Range AssocLeft]
+          ,[  op "+" Plus AssocLeft
+            , op "-" Minus AssocLeft
+            , op "mod" Mod AssocLeft
+            , op "#mod" Mod AssocLeft]
+          ]
+          where 
+          -- The try here is overkill, it is needed to separate '..' 
+          -- from the finalizing '.'. We could just write it out 
+          -- inside the table to avoid having a try for the one 
+          -- letter tokens. 
+          -- op opstr opval assoc = Infix (do{string opstr >> return (Arith opval)}) assoc
+          op opstr opval assoc = Infix (do{try(string opstr) >> return (Arith opval)}) assoc
+
+factor :: GenParser Char st MyExpr
+factor  =       
+        -- This must be before the others or we'll loop 
+        try(do { skipMany space; a <- numeric; skipMany space; return a}) <|>    
+        do{ skipMany space; char '('; skipMany space; 
+            ; x <- expr
+            ; skipMany space
+            ; char ')'; skipMany space; 
+            ; return x
+            } <|> 
+        -- This must be after the parenthesis or we'll loop
+        -- but we must make sure that this is a valid starting 
+        -- point or the expression parser comes here always 
+        -- This may happen if give a statement that cannot be 
+        -- recognized, since nothing matches, we recurse. 
+        do {
+           noneOf "{[]},.+-*/=:;";
+           expr
+        }
+        -- <|> number
+        <?> "simple expression"
+
+
 
 
 -- parse atomm "" "blub"
@@ -780,6 +848,8 @@ atomm    = do { r <- atom; return (r,[])}
 -- parse genrel "" "1 { maps_to(X, U) } 1"
 -- parse genrel "" "{  sat(C) : clause(C) } 1" 
 -- parse genrel "" "{  sat(C) : clause(C) } k-1"
+-- parse genrel "" "{  sat(C) : clause(C) } k-1+2"
+-- parse genrel "" "{  sat(C) : clause(C) } k-1+2*X"
 -- parse genrel "" "{ true(A) : atom(A) }" 
 -- parse genrel "" "2{i(A,\"wp1:active\",\"yes\"),d(A,\"wp1:active\",\"no\")}2"
 -- parse genrel "" "M{\"wp1:commits\"(Cap,A3):\"rdf:type\"(A3,\"wp1:Activity\")}"
@@ -794,6 +864,8 @@ atomm    = do { r <- atom; return (r,[])}
 -- parse genrel "" "not 1 { at(T,D,P) : peg(P) } 1"
 -- parse genrel "" "1 { pos(N,L,T) : L = 1..X : T = 1..Y } 1"
 -- parse genrel "" "foo(X..Y)"
+-- parse genrel "" "{  sat(C) : clause(C) } k*1." -- NOK, ignores the formula, only k stays 
+-- parse genrel "" "{  sat(C) : clause(C) } k*1" -- NOK, ignores the formula, only k stays 
 genrel :: GenParser Char st Body
 genrel    = 
             try(myassign) <|> 
@@ -818,7 +890,13 @@ genrel    =
 -- parse body "" "occurs(X), not occurs(Y) : vtx(X) : Y < X, vtx(X)" 
 -- parse body "" "waitingfor(_,_)."
 -- parse body "" "M = #min [ est(I,S) : est(I,S) : hasest(I) = S ],\nN = #max [ est(J,T) : est(J,T) : hasest(J) = T ], sest(P), est."
--- parse body "" "L = { leaking(V) : leaking(V) }." -- NOK, returns []
+-- parse body "" "L = { leaking(V) : leaking(V) }." 
+-- parse body "" "{  sat(C) : clause(C) } k*1."
+-- parse body "" "{  sat(C) : clause(C) } (k-1)."
+-- parse body "" "field(X;X+1,Y)." -- NOK
+-- parse body "" "done(L,S), reach(J,NJ,M), forth(I,NI,S-(M+1)), NI = L-(NJ+1),\n           link(I,J,V),     leaking(V)." -- stops at NI 
+-- parse body "" "link(I,J,V),\n     leaking(V)."
+
 body :: GenParser Char st [Body]
 body    = do (sepBy genrel (skipMany1 (space <|> char ',')))
 
@@ -842,6 +920,9 @@ body    = do (sepBy genrel (skipMany1 (space <|> char ',')))
 -- parse rule "" "ests(M..N+P) :- M = #min [ est(I,S) : est(I,S) : hasest(I) = S ],\nN = #max [ est(J,T) : est(J,T) : hasest(J) = T ], sest(P), est." -- OK
 -- parse rule "" "dist(#abs(RK1-RK2)) :- restaurant(RN1,RK1), restaurant(RN2,RK2)." -- NOK, Abs
 -- parse rule "" "1 { pos(N,L,T) : L = 1..X : T = 1..Y } 1 :- net(N), layers(X), tracks(Y)." -- NOK
+-- parse rule "" "dneighbor(n,X,Y,X+1,Y) :- field(X;X+1,Y)."
+-- parse rule "" "forth(J,NI+1,S-M) :- done(L,S), reach(J,NJ,M), forth(I,NI,S-(M+1)), NI = L-(NJ+1),\n           link(I,J,V),     leaking(V)."
+
 rule :: GenParser Char st Rules    
 rule    = do { 
                n <- genrel; 
