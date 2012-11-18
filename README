@@ -16,6 +16,12 @@ Requires Haskell platform (http://www.haskell.org/platform/), tested on 2012.2.0
 To produce an executable:
 > ghc -o aspreify main.hs rdfrender.hs txtrender.hs factrender.hs aspparse.hs 
 
+Obtain the sources initially:
+> git clone git://www.github.com/vluukkal/aspreify
+
+Update later on after initially fetching them: 
+> git remote update
+
 A simple test:
 > ./aspreify tests/hamiltonian_cycle.lp
 produces tests/hamiltonian_cycle.lp.reified 
@@ -38,32 +44,22 @@ return values, but the result file contains the syntax error.
 
 2.2 Non-supported syntax 
 
-Expressions with more than two arguments are not supported; e.g.
-k + 2 + 1 will produce a parse error. 
+Inbuilt functions are not supported, e.g dist(#abs(RK1-RK2)),
+the #abs function is not recognized.
 
 All syntax should be parsed, but at this version only the -t option 
 will render the following declarations, default and -r will ignore them
 in the result: 
 - maximize, minimize, compute, function, external, show, hide 
+- #show, #hide
+
+Sometimes the hashed primitives will be converted back to nonhashed
+ones, e.g. #mod -> mod. 
 
 At times the parser may be more liberal than the lparse one,
 e.g. minimize { a(X), b(Y) } will be accepted. 
 
-In the lparse release there are many example programs in the examples/ 
-directory. Here we list those that are known not to work with
-aspreify and the cause for it. 
-
-examples/graph/
-All OK
-
-examples/logic/
-All OK
-
-examples/planning/
-All OK
-
-examples/puzzles/
-All OK
+All of the examples in lparse examples/ directory are parsed. 
 
 3. Other documentation 		
 
@@ -78,6 +74,11 @@ TODO
 Compile the parser test suite and run it:
 > ghc -o runparsertests testaspparse.hs aspparse.hs 
 > ./runparsertests 
+
+5. Other
+
+The toviz.py program reads in the reified program and generates a
+graphviz graph out of it. 
 
 #EOF
 
