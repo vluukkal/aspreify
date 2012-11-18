@@ -205,6 +205,8 @@ tbody8 = TestCase $ assertEqual "body 8" [Plain (Const "waitingfor") [Sym (Var "
 
 tbody9 = TestCase $ assertEqual "body 9" [Assignment (Var "M") (Optimize False [Typed [Plain (Const "est") [Sym (Var "I"),Sym (Var "S")] True,Plain (Const "est") [Sym (Var "I"),Sym (Var "S")] True,Weighed (Sym (Var "S")) (Plain (Const "hasest") [Sym (Var "I")] True) True]] True) True,Assignment (Var "N") (Optimize True [Typed [Plain (Const "est") [Sym (Var "J"),Sym (Var "T")] True,Plain (Const "est") [Sym (Var "J"),Sym (Var "T")] True,Weighed (Sym (Var "T")) (Plain (Const "hasest") [Sym (Var "J")] True) True]] True) True,Plain (Const "sest") [Sym (Var "P")] True,Plain (Const "est") [] True] (wrapparser_bl body "" "M = #min [ est(I,S) : est(I,S) : hasest(I) = S ],\nN = #max [ est(J,T) : est(J,T) : hasest(J) = T ], sest(P), est.")
 
+tbody10 = TestCase $ assertEqual "body 10" [Card (Sym (Const "any")) (Arith Mult (Sym (Const "k")) (Number (Const "1"))) [Typed [Plain (Const "sat") [Sym (Var "C")] True,Plain (Const "clause") [Sym (Var "C")] True]] True] (wrapparser_bl body "" "{  sat(C) : clause(C) } k*1.")
+
 -- tbody = TestCase $ assertEqual "body X"  (wrapparser_bl body "" "")
 
 tgenrel1 = TestCase $ assertEqual "genrel 1" (Plain (Const "blub") [] True) (wrapparser_bl' genrel "" "blub")
@@ -261,6 +263,20 @@ tnumericexpr2 = TestCase $ assertEqual "numericexpr 2" (Sym (Const "k")) (wrappa
 
 tnumericexpr3 = TestCase $ assertEqual "numericexpr 3" (Number (Const "1")) (wrapparser_exp numericexpr "" "1")
 
+tnumericexpr4 = TestCase $ assertEqual "numericexpr 4" (Arith Mult (Arith Plus (Sym (Const "k")) (Number (Const "2"))) (Sym (Var "Z"))) (wrapparser_exp numericexpr "" "(k + 2) * Z")
+
+tnumericexpr5 = TestCase $ assertEqual "numericexpr 5" (Arith Plus (Sym (Const "k")) (Arith Mult (Number (Const "2")) (Sym (Var "Z")))) (wrapparser_exp numericexpr "" "k + 2 * Z")
+
+tnumericexpr6 = TestCase $ assertEqual "numericexpr 6" (Arith Div (Arith Mod (Sym (Const "k")) (Sym (Const "\"jopi\""))) (Sym (Var "Z"))) (wrapparser_exp numericexpr "" "(k mod \"jopi\") / (Z)")
+
+tnumericexpr7 = TestCase $ assertEqual "numericexpr 7" (Alternative [Sym (Var "X"),Sym (Var "Y"),Sym (Const "k"),Number (Const "1")]) (wrapparser_exp numericexpr "" "X;Y;k;1")
+
+tnumericexpr8 = TestCase $ assertEqual "numericexpr 8" (Arith Range (Number (Const "1")) (Sym (Var "X"))) (wrapparser_exp numericexpr "" "1..X")
+
+tnumericexpr9 = TestCase $ assertEqual "numericexpr 9" (Arith Div (Arith Range (Number (Const "1")) (Sym (Var "X"))) (Number (Const "2")))  (wrapparser_exp numericexpr "" "1..X/2")
+
+
+
 -- tnumericexpr = TestCase $ assertEqual "numericexpr X"  (wrapparser_exp numericexpr "" "")
 
 -- Note that "+ 2" are not parsed 
@@ -285,6 +301,7 @@ tnexpr3 = TestCase $ assertEqual "nexpr 3" (Arith Plus (Sym (Const "k")) (Sym (V
 tnexpr4 = TestCase $ assertEqual "nexpr 4" (Sym (Const "Erroneous MyExpr")) (wrapparser_exp nexpr "" "k + + Z")
 
 -- tnexpr = TestCase $ assertEqual "nexpr X"  (wrapparser_exp nexpr "" "")
+
 
 tbexpr1 = TestCase $ assertEqual "bexpr 1" (BExpr Gt (Sym (Const "k")) (Number (Const "2"))) (wrapparser_bl' bexpr "" "k > 2")
 
@@ -545,13 +562,14 @@ tests = TestList [ truleorfact1, truleorfact2, trulebase1, trulebase2, trulebase
                     tfact1, tfact2,tdeny1, tdeny2, tdeny3, tdeny4, tdeny5, tdeny6,
                     trule1, trule2, trule3, trule4, trule5, trule6, trule7, trule8, trule9, 
                     trule10, trule11, trule12, trule13, trule14, trule15,
-                    tbody1,tbody2, tbody3, tbody4, tbody5, tbody6, tbody7, tbody8,tbody9,
+                    tbody1,tbody2, tbody3, tbody4, tbody5, tbody6, tbody7, tbody8,tbody9,tbody10,
                     tgenrel1, tgenrel2, tgenrel3, tgenrel4, tgenrel5, tgenrel6, tgenrel7, tgenrel8,
                     tgenrel9, tgenrel10, tgenrel11, tgenrel12, tgenrel13, tgenrel14, tgenrel15, 
                     tgenrel16, tgenrel17, tgenrel18, tgenrel19, tgenrel20, tgenrel21,
                     tarel1, 
                     tarel''1, tarel''2,
-                    tnumericexpr1, tnumericexpr2, tnumericexpr3,
+                    tnumericexpr1, tnumericexpr2, tnumericexpr3,tnumericexpr4,tnumericexpr5,
+                    tnumericexpr6, tnumericexpr7,tnumericexpr8,tnumericexpr9,
                     tnumeric1 , tnumeric2, tnumeric3, tnumeric4, tnumeric5,
                     tnexpr1 , tnexpr2, tnexpr3, tnexpr4,
                     tbexpr1, tbexpr2,
