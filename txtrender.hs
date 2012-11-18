@@ -106,42 +106,42 @@ txtbody' r accu =
 txtitem i accu =
     case i of
       Rule b l -> accu ++ L.head(txtbody' b []) ++ " :- \n\t " ++ 
-                  L.unwords(L.intersperse ",\n\t" (L.foldr txtbody' [] (l))) ++ 
+                  L.unwords(L.intersperse ",\n\t" (L.foldr txtbody' [] (L.reverse l))) ++ 
                  ".\n\n"
       Deny l -> accu  ++ ":- \n\t " ++ 
-                L.unwords(L.intersperse ",\n\t" (L.foldr txtbody' [] (l))) ++ ".\n\n"
+                L.unwords(L.intersperse ",\n\t" (L.foldr txtbody' [] (L.reverse l))) ++ ".\n\n"
       Fact l -> accu  ++ 
-                L.unwords(L.intersperse ",\n\t" (L.foldr txtbody' [] (l))) ++ ".\n\n"
+                L.unwords(L.intersperse ",\n\t" (L.foldr txtbody' [] (L.reverse l))) ++ ".\n\n"
       Hide l -> accu ++ L.unwords(L.intersperse ",\n" 
                                 (L.foldr (\x a -> ("hide " ++ x):a) [] 
-                                 (L.foldr txtbody' [] (l)))) ++ ".\n\n"
+                                 (L.foldr txtbody' [] (L.reverse l)))) ++ ".\n\n"
       Show l -> accu ++ L.unwords(L.intersperse ",\n" 
                                 (L.foldr (\x a -> ("show " ++ x):a) [] 
-                                 (L.foldr txtbody' [] (l)))) ++ ".\n\n"
+                                 (L.foldr txtbody' [] (L.reverse l)))) ++ ".\n\n"
       GHide l -> accu ++ L.unwords(L.intersperse ",\n" 
                                 (L.foldr (\x a -> ("#hide " ++ x):a) [] 
-                                 (L.foldr txtbody' [] (l)))) ++ ".\n\n"
+                                 (L.foldr txtbody' [] (L.reverse l)))) ++ ".\n\n"
       GShow l -> accu ++ L.unwords(L.intersperse ",\n" 
                                 (L.foldr (\x a -> ("#show " ++ x):a) [] 
-                                 (L.foldr txtbody' [] (l)))) ++ ".\n\n"
+                                 (L.foldr txtbody' [] (L.reverse l)))) ++ ".\n\n"
       Consts l -> accu ++ L.unwords(L.intersperse ",\n" 
                                 (L.foldr (\x a -> ("const " ++ x):a) [] 
-                                 (L.foldr txtbody' [] (l)))) ++ ".\n\n"
+                                 (L.foldr txtbody' [] (L.reverse l)))) ++ ".\n\n"
       External l -> accu ++ L.unwords(L.intersperse ",\n" 
                                 (L.foldr (\x a -> ("external " ++ x):a) [] 
-                                 (L.foldr txtbody' [] (l)))) ++ ".\n\n"
+                                 (L.foldr txtbody' [] (L.reverse l)))) ++ ".\n\n"
       Function l -> accu ++ L.unwords(L.intersperse ",\n" 
                                 (L.foldr (\x a -> ("function " ++ x):a) [] 
-                                 (L.foldr txtbody' [] (l)))) ++ ".\n\n"
+                                 (L.foldr txtbody' [] (L.reverse l)))) ++ ".\n\n"
       Minimize l -> accu ++ L.unwords(L.intersperse ",\n" 
                                 (L.foldr (\x a -> ("minimize " ++ x):a) [] 
-                                 (L.foldr txtbody' [] (l)))) ++ ".\n\n"
+                                 (L.foldr txtbody' [] (L.reverse l)))) ++ ".\n\n"
       Maximize l -> accu ++ L.unwords(L.intersperse ",\n" 
                                 (L.foldr (\x a -> ("maximize " ++ x):a) [] 
-                                 (L.foldr txtbody' [] (l)))) ++ ".\n\n"
+                                 (L.foldr txtbody' [] (L.reverse l)))) ++ ".\n\n"
       Computes n l -> accu ++ L.unwords(L.intersperse ",\n" 
                                 (L.foldr (\x a -> ("compute " ++ unatom(n) ++ " " ++ x):a) [] 
-                                 (L.foldr txtbody' [] (l)))) ++ ".\n\n"
+                                 (L.foldr txtbody' [] (L.reverse l)))) ++ ".\n\n"
 
 
 txtrender rb = 
