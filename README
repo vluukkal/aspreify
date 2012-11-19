@@ -44,8 +44,7 @@ return values, but the result file contains the syntax error.
 
 2.2 Non-supported syntax 
 
-Inbuilt functions are not supported, e.g dist(#abs(RK1-RK2)),
-the #abs function is not recognized.
+All of the examples in lparse distribution examples/ directory are parsed. 
 
 All syntax should be parsed, but at this version only the -t option 
 will render the following declarations, default and -r will ignore them
@@ -59,14 +58,11 @@ ones, e.g. #mod -> mod.
 At times the parser may be more liberal than the lparse one,
 e.g. minimize { a(X), b(Y) } will be accepted. 
 
-All of the examples in lparse examples/ directory are parsed. 
-
 3. Other documentation 		
 
 TODO
 - List the produced factnames and the documentation for them
-- add full rendering of all directives of the lparse language
-- add support for the gringo input language
+- add full rendering of all directives of the lparse/gringo language
 - have a look at quickcheck  
 
 4. Self tests 
