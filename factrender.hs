@@ -391,6 +391,10 @@ unfactmyexpr a exprid ctr =
       Number s -> (unfactcatom s exprid)
       Alternative l -> ("altlist(" ++ show(exprid) ++ ").\n") ++ (unaltlist l ctr exprid)
       Arith op a1 a2 -> (unfactarith op a1 a2 exprid ctr)
+      Func n a nonneg -> let embed = FactRender.getnext(ctr) in 
+                          "func" ++ "(" ++ show(exprid) ++ "," ++ show(embed) ++ ")." ++ "\n" ++
+                          "fname(" ++ show(embed) ++ "," ++ show(unatom(n)) ++ ")." ++ "\n" ++
+                          factargs embed a ctr
 
 unaltlist a ctr parentid = 
     if length a == 0 

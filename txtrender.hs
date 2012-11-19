@@ -34,6 +34,17 @@ import Data.Text
 
 import AspParse
 
+unarith op a1 a2 = 
+    (unmyexpr a1) ++ " " ++  (unop op) ++ " " ++ (unmyexpr a2)
+
+unmyexpr a = 
+    case a of 
+      Sym s -> (unatom s)
+      Number s -> (unatom s)
+      Alternative l -> L.concat $ (L.intersperse ";" (L.foldr (\x accu -> (unmyexpr x):accu) [] l))
+      Arith op a1 a2 -> (unarith op a1 a2)
+      Func n a nonneg -> (unatom(n) ++ txtargs a)
+
 txtargs a = 
     if L.length a == 0 
     then ""

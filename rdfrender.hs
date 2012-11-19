@@ -74,6 +74,14 @@ unrdfmyexpr a exprid =
                   (show exprid) ++ ",rdf:type,http://m3.org/rls#altlist\n" ++ 
                   (rdfargs exprid l)
       Arith op a1 a2 -> (unrdfarith op a1 a2 exprid)
+      Func n a nonneg -> let embed = (myrand())::Int in 
+                        show(exprid) ++ "," ++ "http://m3.org/rls#func" ++ "," ++ 
+                        show(embed) ++ "\n" ++
+                        show(exprid) ++ ",rdf:type,http://m3.org/rls#func\n" ++
+                        show(exprid) ++ ",owl:subClassof,http://m3.org/rls#stmt\n" ++
+                        show(exprid) ++ ",http://m3.org/rls#fname," ++ 
+                            show(unatom(n)) ++ "\n" ++ 
+                        rdfargs embed a             
 
 rdfargs parentid a = 
     if length a == 0 
