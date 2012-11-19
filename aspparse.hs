@@ -102,10 +102,12 @@ data BOp = Gt
           | Eqeq
             deriving(Show,Eq)
 
+-- It may be a mistake to separate these from Body types ...
 data MyExpr = Number Atom
             | Sym Atom
             | Alternative [MyExpr]
             | Arith MyOp MyExpr MyExpr 
+            | Func Atom [MyExpr] Bool -- a copy of Plain Body. 
             deriving(Show,Eq)
 
 
@@ -135,13 +137,16 @@ variable   = anyvar <|>
 -- parse atomsimple "" "blah"
 -- atomsimple :: GenParser Char st String
 atomsimple :: GenParser Char st Atom
-atomsimple   = do{ c  <- lower
+atomsimple   = do{ -- c  <- lower
+               c  <- atomstarter
                 -- ; cs <- option "" (many (noneOf "\n\r\t (){,."))
                 ; cs <- option "" (many (noneOf "\n\r\t (){[]},.+-*/=:;<>"))
                 -- ; cs <- many letter
                 ; skipMany space
                 ; return (Const (c:cs))
                 }
+
+atomstarter = char '#' <|> lower
 
 -- parse atomquoted "" "\"Foo\""
 -- parse atomquoted "" "\"wp1:Person\""
@@ -206,6 +211,8 @@ myelem =
 -- parse args "" "(foo,\"Bar\",5)"
 -- parse args "" "(X;X+1,Y)"
 -- parse args "" "((N-1)*R+1,N)"
+-- parse args "" "(#abs(RK1-RK2),Z)"
+-- parse args "" "(#abs(RK1-RK2))" -- NOK
 args :: GenParser Char st [MyExpr]
 -- args    = do { cs <- between '(' ')' many (noneOf "\n\r\t ()")
 --               ; return cs}
@@ -216,7 +223,18 @@ args    = do { skipMany space;
                -- but the closing one should allow spaces, otherwise
                -- a typed choice (!) fails. 
                words <- between (char '(')
-                                (skipMany1 ( space <|> char ')' <|> space))  -- (char ')') 
+                                (skipMany1 ( space <|> char ')' <|> space))  
+                                -- (char ')') 
+                   (sepBy myelem (skipMany1 (space <|> char ',')))
+                        ; return words}
+
+-- parse fargs "" "(#abs(RK1-RK2))" -- OK 
+-- 
+-- this is in tolerable, args should work! Why is tchoice failing otherwise?
+fargs :: GenParser Char st [MyExpr]
+fargs    = do { skipMany space; 
+               words <- between (char '(')
+                                 (char ')') 
                    (sepBy myelem (skipMany1 (space <|> char ',')))
                         ; return words}
 
@@ -798,10 +816,12 @@ numeric    =
 -- parse numericexpr "" "X+1"
 -- parse numericexpr "" "1..X"
 -- parse numericexpr "" "(N-1)*R+1"
+-- parse numericexpr "" "#abs(N-1, X, 1)"
 numericexpr :: GenParser Char st MyExpr
 numericexpr = 
     -- try(nexpr) <|>
     try (altexpr) <|> -- added 
+    try(func) <|>
     try(expr) <|>
     try(numeric)
     <?> "A numeric expression"
@@ -861,6 +881,24 @@ atomm :: GenParser Char st (Atom,[MyExpr])
 -- atomm :: GenParser Char st (Atom,[MyExpr])
 atomm    = do { r <- atom; return (r,[])}
 
+-- A function which always resides inside an atom,
+-- name and a list of arguments. We cheat and use
+-- 'srel'. 
+-- parse func "" "#abs(N,N+1)"
+func :: GenParser Char st MyExpr
+{--
+func    = do {
+             (Plain n myargs b) <- srel;
+            ;return (Func n myargs True)}
+--}
+func    = do {n <- atom; many space;
+            ;myargs <- fargs
+            ;return (Func n myargs True)}
+
+
+
+
+
 -- Generic rel, fact or relation
 -- parse genrel "" "blub"
 -- parse genrel "" "blub(Foo,Bar,Goo)"
@@ -888,9 +926,9 @@ atomm    = do { r <- atom; return (r,[])}
 -- parse genrel "" "not 1 { at(T,D,P) : peg(P) } 1"
 -- parse genrel "" "1 { pos(N,L,T) : L = 1..X : T = 1..Y } 1"
 -- parse genrel "" "foo(X..Y)"
--- parse genrel "" "{  sat(C) : clause(C) } k*1." -- NOK, ignores the formula, only k stays 
--- parse genrel "" "{  sat(C) : clause(C) } k*1" -- NOK, ignores the formula, only k stays 
--- parse genrel "" "border((N-1)*R+1,N)."  -- stops at * 
+-- parse genrel "" "{  sat(C) : clause(C) } k*1"
+-- parse genrel "" "border((N-1)*R+1,N)." 
+-- parse genrel "" "dist(#abs(RK1-RK2))
 genrel :: GenParser Char st Body
 genrel    = 
             try(myassign) <|> 
@@ -948,7 +986,7 @@ body    = do (sepBy genrel (skipMany1 (space <|> char ',')))
 -- parse rule "" "dneighbor(n,X,Y,X+1,Y) :- field(X;X+1,Y)."
 -- parse rule "" "forth(J,NI+1,S-M) :- done(L,S), reach(J,NJ,M), forth(I,NI,S-(M+1)), NI = L-(NJ+1),\n           link(I,J,V),     leaking(V)."
 -- parse rule "" "border((N-1)*R+1) :- number(N), sqrt(R), N<=R."
-
+-- parse rule "" "dist(#abs(RK1-RK2)) :- restaurant(RN1,RK1), restaurant(RN2,RK2)."
 rule :: GenParser Char st Rules    
 rule    = do { 
                n <- genrel; 
@@ -1333,7 +1371,7 @@ unbop op =
       Eq -> "="
       Neq -> "!="
       Eqeq -> "=="
-
+{--
 unarith op a1 a2 = 
     (unmyexpr a1) ++ " " ++  (unop op) ++ " " ++ (unmyexpr a2)
 
@@ -1343,7 +1381,8 @@ unmyexpr a =
       Number s -> (unatom s)
       Alternative l -> List.concat $ (List.intersperse ";" (List.foldr (\x accu -> (unmyexpr x):accu) [] l))
       Arith op a1 a2 -> (unarith op a1 a2)
-
+      Func op a1 a2 -> (unatom(n) ++ txtargs a)
+--}
 
 type Counter = Int -> IO Int 
 
