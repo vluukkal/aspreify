@@ -185,6 +185,8 @@ trule15 = TestCase $ assertEqual "rule 15" (Fact [])  (wrapparser rule "" "ready
 
 trule16 = TestCase $ assertEqual "rule 16"  (Rule (Plain (Const "border") [Arith Plus (Arith Mult (Arith Minus (Sym (Var "N")) (Number (Const "1"))) (Sym (Var "R"))) (Number (Const "1"))] True) [Plain (Const "number") [Sym (Var "N")] True,Plain (Const "sqrt") [Sym (Var "R")] True,BExpr LtEq (Sym (Var "N")) (Sym (Var "R"))]) (wrapparser rule "" "border((N-1)*R+1) :- number(N), sqrt(R), N<=R.")
 
+trule17 = TestCase $ assertEqual "rule 17" (Rule (Plain (Const "dist") [Func (Const "#abs") [Arith Minus (Sym (Var "RK1")) (Sym (Var "RK2"))] True] True) [Plain (Const "restaurant") [Sym (Var "RN1"),Sym (Var "RK1")] True,Plain (Const "restaurant") [Sym (Var "RN2"),Sym (Var "RK2")] True]) (wrapparser rule "" "dist(#abs(RK1-RK2)) :- restaurant(RN1,RK1), restaurant(RN2,RK2).")
+
 -- trule = TestCase $ assertEqual "rule X"  (wrapparser rule "" "")
 -- tdeny = TestCase $ assertEqual "deny X"  (wrapparser deny "" "")
 -- trulebase = TestCase $ assertEqual "rulebase X"  (wrapparser' rulebase "" "")
@@ -257,6 +259,8 @@ tgenrel20 = TestCase $ assertEqual "genrel 20"  (Optimize True [Typed [Plain (Co
 
 tgenrel21 = TestCase $ assertEqual "genrel 21" (Assignment (Var "M") (Optimize False [Typed [Plain (Const "est") [Sym (Var "I"),Sym (Var "S")] True,Plain (Const "est") [Sym (Var "I"),Sym (Var "S")] True,Weighed (Sym (Var "S")) (Plain (Const "hasest") [Sym (Var "I")] True) True]] True) True) (wrapparser_bl' genrel "" "M = #min [ est(I,S) : est(I,S) : hasest(I) = S ]")
 
+tgenrel22 = TestCase $ assertEqual "genrel 22" (Plain (Const "dist") [Func (Const "#abs") [Arith Minus (Sym (Var "RK1")) (Sym (Var "RK2"))] True] True) (wrapparser_bl' genrel "" "dist(#abs(RK1-RK2))")
+
 -- tgenrel = TestCase $ assertEqual "genrel X"  (wrapparser_bl' genrel "" "")
 
 tnumericexpr1 = TestCase $ assertEqual "numericexpr 1" (Arith Plus (Sym (Const "k")) (Number (Const "2"))) (wrapparser_exp numericexpr "" "k + 2")
@@ -279,7 +283,7 @@ tnumericexpr9 = TestCase $ assertEqual "numericexpr 9" (Arith Div (Arith Range (
 
 tnumericexpr10 = TestCase $ assertEqual "numericexpr 10" (Arith Plus (Arith Mult (Arith Minus (Sym (Var "N")) (Number (Const "1"))) (Sym (Var "R"))) (Number (Const "1"))) (wrapparser_exp numericexpr "" "(N-1)*R+1")
 
-
+tnumericexpr11 = TestCase $ assertEqual "numericexpr 11" (Func (Const "#abs") [Arith Minus (Sym (Var "N")) (Number (Const "1")),Sym (Var "X"),Number (Const "1")] True) (wrapparser_exp numericexpr "" "#abs(N-1, X, 1)")
 
 -- tnumericexpr = TestCase $ assertEqual "numericexpr X"  (wrapparser_exp numericexpr "" "")
 
@@ -474,7 +478,18 @@ targs13 = TestCase $ assertEqual "args 13" [Alternative [Sym (Var "X"),Arith Plu
 
 targs14 = TestCase $ assertEqual "args 14" [Arith Plus (Arith Mult (Arith Minus (Sym (Var "N")) (Number (Const "1"))) (Sym (Var "R"))) (Number (Const "1")),Sym (Var "N")] (wrapparser_exp' args "" "((N-1)*R+1,N)")
 
+targs15 = TestCase $ assertEqual "args 15" [Func (Const "#abs") [Arith Minus (Sym (Var "RK1")) (Sym (Var "RK2"))] True,Sym (Var "Z")] (wrapparser_exp' args "" "(#abs(RK1-RK2),Z)")
+
+-- This does not work, but it really should, have a look at farg!
+-- Or does it work still???
+targs16 = TestCase $ assertEqual "args 16" [Func (Const "#abs") [Arith Minus (Sym (Var "RK1")) (Sym (Var "RK2"))] True] (wrapparser_exp' args "" "(#abs(RK1-RK2))")
+
 -- targs = TestCase $ assertEqual "args X"  (wrapparser_exp' args "" "")
+
+tfargs1 = TestCase $ assertEqual "fargs 1" [Func (Const "#abs") [Arith Minus (Sym (Var "RK1")) (Sym (Var "RK2"))] True] (wrapparser_exp' fargs "" "(#abs(RK1-RK2))")
+
+tfargs2 = TestCase $ assertEqual "fargs 2" [Func (Const "#abs") [Arith Minus (Sym (Var "RK1")) (Sym (Var "RK2"))] True,Sym (Var "Z")] (wrapparser_exp' fargs "" "(#abs(RK1-RK2),Z)")
+
 
 tmyelem1 = TestCase $ assertEqual "myelem 1" (Sym (Var "Foo")) (wrapparser_exp myelem "" "Foo")
 
@@ -548,6 +563,11 @@ taltexpr5 = TestCase $ assertEqual "altexpr 5" (Alternative [Sym (Var "Foo"),Sym
  
 -- taltexpr = TestCase $ assertEqual "altexpr X"  (wrapparser_expr altexpr "" "")
 
+tfunc1 = TestCase $ assertEqual "func 1" (Func (Const "#abs") [Sym (Var "N"),Arith Plus (Sym (Var "N")) (Number (Const "1"))] True) (wrapparser_exp func "" "#abs(N,N+1)")
+
+-- tfunc = TestCase $ assertEqual "func X"  (wrapparser_expr func "" "")
+
+
 tshoworhide1 = TestCase $ assertEqual "showorhide 1" (Show [Plain (Const "waitingfor") [Sym (Var "_"),Sym (Var "_")] True]) (wrapparser showorhide "" "show waitingfor(_,_).")
 
 tshoworhide2 = TestCase $ assertEqual "showorhide 2" (GShow [Plain (Const "waitingfor") [Sym (Var "_"),Sym (Var "_")] True]) (wrapparser showorhide "" "#show waitingfor(_,_).")
@@ -579,15 +599,16 @@ tests = TestList [ truleorfact1, truleorfact2, trulebase1, trulebase2, trulebase
                     trulebase11, trulebase12, trulebase13, trulebase14, trulebase15, tconstdef1,
                     tfact1, tfact2,tdeny1, tdeny2, tdeny3, tdeny4, tdeny5, tdeny6,
                     trule1, trule2, trule3, trule4, trule5, trule6, trule7, trule8, trule9, 
-                    trule10, trule11, trule12, trule13, trule14, trule15,trule16, 
+                    trule10, trule11, trule12, trule13, trule14, trule15,trule16,trule17, 
                     tbody1,tbody2, tbody3, tbody4, tbody5, tbody6, tbody7, tbody8,tbody9,tbody10,
                     tgenrel1, tgenrel2, tgenrel3, tgenrel4, tgenrel5, tgenrel6, tgenrel7, tgenrel8,
                     tgenrel9, tgenrel10, tgenrel11, tgenrel12, tgenrel13, tgenrel14, tgenrel15, 
-                    tgenrel16, tgenrel17, tgenrel18, tgenrel19, tgenrel20, tgenrel21,
+                    tgenrel16, tgenrel17, tgenrel18, tgenrel19, tgenrel20, tgenrel21,tgenrel22,
                     tarel1, tarel2, 
                     tarel''1, tarel''2,
                     tnumericexpr1, tnumericexpr2, tnumericexpr3,tnumericexpr4,tnumericexpr5,
                     tnumericexpr6, tnumericexpr7,tnumericexpr8,tnumericexpr9,tnumericexpr10, 
+                    tnumericexpr11, 
                     tnumeric1 , tnumeric2, tnumeric3, tnumeric4, tnumeric5,
                     tnexpr1 , tnexpr2, tnexpr3, tnexpr4,
                     tbexpr1, tbexpr2,
@@ -600,7 +621,8 @@ tests = TestList [ truleorfact1, truleorfact2, trulebase1, trulebase2, trulebase
                     tsrel1, tsrel2, tsrel3, tsrel4,tsrel5, 
                     twrel1, twrel2, twrel3, tnegrel1, tarel1,
                     targs1,targs2,targs3,targs4,targs5,targs6,targs7,targs8,targs9,
-                    targs10,targs11,targs12,targs13, targs14, 
+                    targs10,targs11,targs12,targs13, targs14, targs15, targs16,
+                    tfargs1, tfargs2, 
                     tmyelem1, tmyelem2, tmyelem3, tmyelem4,
                     tatom1,tatom2,tatom3,tatom4,tatom5,tatom6,
                     tnvariable1, tnvariable2, tnvariable3,
