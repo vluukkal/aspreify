@@ -115,7 +115,7 @@ data MyExpr = Number Atom
 -- parse nvariable "" "X > Y"
 nvariable :: GenParser Char st Atom
 nvariable   = do{ c  <- upper
-                ; cs <- option "" (many (noneOf "\n\r\t (){[]},.+-*/=:;"))
+                ; cs <- option "" (many (noneOf "\n\r\t (){[]},.+-*/=:;<>"))
                 ; skipMany space
                 ; return (Var (c:cs))
                 }
@@ -137,7 +137,7 @@ variable   = anyvar <|>
 atomsimple :: GenParser Char st Atom
 atomsimple   = do{ c  <- lower
                 -- ; cs <- option "" (many (noneOf "\n\r\t (){,."))
-                ; cs <- option "" (many (noneOf "\n\r\t (){[]},.+-*/=:;"))
+                ; cs <- option "" (many (noneOf "\n\r\t (){[]},.+-*/=:;<>"))
                 -- ; cs <- many letter
                 ; skipMany space
                 ; return (Const (c:cs))
@@ -205,14 +205,18 @@ myelem =
 -- parse args "" "(foo,Bar,5)"
 -- parse args "" "(foo,\"Bar\",5)"
 -- parse args "" "(X;X+1,Y)"
+-- parse args "" "((N-1)*R+1,N)"
 args :: GenParser Char st [MyExpr]
 -- args    = do { cs <- between '(' ')' many (noneOf "\n\r\t ()")
 --               ; return cs}
 -- args    = do { words <- sepBy variable commasep; return words}
 -- args    = do { words <- between (char '(') (char ')')
-args    = do { words <- between (skipMany1 (space <|> char '(' <|> space ))
-                                -- (skipMany1 (space <|> char ')')) 
-                                (skipMany1 ( space <|> char ')' <|> space)) 
+args    = do { skipMany space; 
+               -- Here we need to be precise on the opening parenthesis 
+               -- but the closing one should allow spaces, otherwise
+               -- a typed choice (!) fails. 
+               words <- between (char '(')
+                                (skipMany1 ( space <|> char ')' <|> space))  -- (char ')') 
                    (sepBy myelem (skipMany1 (space <|> char ',')))
                         ; return words}
 
@@ -247,6 +251,7 @@ data Rules = Rule Body [Body]
             deriving (Show,Eq)
 
 -- parse arel "" "arc(X, Y, L) = L"
+-- parse arel "" "border((N-1)*R+1,N)."
 arel :: GenParser Char st Body
 arel    = try(arel'') <|> 
           arel' 
@@ -346,7 +351,7 @@ wrel''    = myassign''''
 -- parse srel "" "r, s, not t" -- unexpected ','
 -- parse srel "" "color(1 .. k)"
 -- parse srel "" "blub(Foo,\"Bar\",Goo)"
-
+-- parse srel "" "border((N-1)*R+1,N)."
 -- A simple relation 
 srel :: GenParser Char st Body
 srel    = do {n <- atom; many space;
@@ -378,10 +383,11 @@ negatomrel    = do {string "not"; many space; n <- atom
 -- parse trel "" "blub(Foo,Bar,Goo)" -- fails, not typed 
 -- parse trel "" "f : vtx(Y) : Y < X."
 -- parse trel "" "f : vtx(Y) : Y < X : L = X..Y."
--- parse trel "" "forth(J,NI+1,S-M) :" -- nok
--- parse trel "" "forth(J,NI+1,S-M) :-" -- nok
+-- parse trel "" "forth(J,NI+1,S-M) :" -- Should fail, we should not parse too far
+-- parse trel "" "forth(J,NI+1,S-M) :-" -- Should fail
 trel :: GenParser Char st Body
-trel    = do {one <- arel;
+trel    = do { 
+              one <- arel;
               skipMany1 (space <|> justcolon <|> space ); 
               rest <- (sepBy1 arel (skipMany1 (space <|> justcolon)));              
               -- the above forces that there is at least        
@@ -455,15 +461,18 @@ justcolon = do {
 -- parse rel "" "not r, s, not t" -- only the 1st one is handled
 -- parse rel "" "ttask(I,D) : ttask(I,D) : not haslet(I) : not tsklet(I) = D"
 -- parse rel "" "field(X;X+1,Y)" -- NOK, wont parse the arguments 
+-- parse rel "" "border((N-1)*R+1,N)."
+
 rel :: GenParser Char st Body
 {--
 rel     = try(negrel) <|>
           try(trel) <|>
           try(srel)
 --}       
-rel     =  try(trel) <|> 
-           try(arel) <|>
-           try(atomrel) -- must be last 
+rel     =  do { 
+                try(trel) <|> 
+                try(arel) <|>
+                try(atomrel)} -- must be last 
 
     
 
@@ -554,7 +563,6 @@ myassign'''' = do {
 -- parse mychoice "" "{ p, t, not x }" 
 -- parse mychoice "" "1 { p, not t t}"  --- error, as it should be 
 -- parse mychoice "" "not 1 { at(T,D,P) : peg(P) } 1"
--- parse mychoice "" "{  sat(C) : clause(C) } k-1"
 -- parse mychoice "" "{  sat(C) : clause(C) } k*(1/X)"
 mychoice :: GenParser Char st Body
 mychoice = do {
@@ -658,11 +666,26 @@ optstmt = do {
 
 
 -- anumber :: GenParser Char st String
+-- Urgh, a redundant try. 
+-- One of these days this could be done, but I suppose
+-- the reduction of try should start elsewhere:
+-- http://www.haskell.org/pipermail/haskell-cafe/2002-August/003280.html
 anumber :: GenParser Char st Atom 
-anumber    = do 
+anumber    = 
+           try(anumber'') <|>
+           anumber'
+
+anumber'    = do 
            {
              low <- many1 digit; many space; return (Const low)
            }
+
+anumber''    = do 
+           {
+             char '-'; skipMany space; low <- many1 digit; many space; return (Const ('-':low))
+           }
+
+
 
 
 -- fails:          
@@ -774,6 +797,7 @@ numeric    =
 -- parse numericexpr "" "X"
 -- parse numericexpr "" "X+1"
 -- parse numericexpr "" "1..X"
+-- parse numericexpr "" "(N-1)*R+1"
 numericexpr :: GenParser Char st MyExpr
 numericexpr = 
     -- try(nexpr) <|>
@@ -866,6 +890,7 @@ atomm    = do { r <- atom; return (r,[])}
 -- parse genrel "" "foo(X..Y)"
 -- parse genrel "" "{  sat(C) : clause(C) } k*1." -- NOK, ignores the formula, only k stays 
 -- parse genrel "" "{  sat(C) : clause(C) } k*1" -- NOK, ignores the formula, only k stays 
+-- parse genrel "" "border((N-1)*R+1,N)."  -- stops at * 
 genrel :: GenParser Char st Body
 genrel    = 
             try(myassign) <|> 
@@ -896,7 +921,7 @@ genrel    =
 -- parse body "" "field(X;X+1,Y)." -- NOK
 -- parse body "" "done(L,S), reach(J,NJ,M), forth(I,NI,S-(M+1)), NI = L-(NJ+1),\n           link(I,J,V),     leaking(V)." -- stops at NI 
 -- parse body "" "link(I,J,V),\n     leaking(V)."
-
+-- parse body "" "border((N-1)*R+1,N)."  -- stops at * 
 body :: GenParser Char st [Body]
 body    = do (sepBy genrel (skipMany1 (space <|> char ',')))
 
@@ -922,6 +947,7 @@ body    = do (sepBy genrel (skipMany1 (space <|> char ',')))
 -- parse rule "" "1 { pos(N,L,T) : L = 1..X : T = 1..Y } 1 :- net(N), layers(X), tracks(Y)." -- NOK
 -- parse rule "" "dneighbor(n,X,Y,X+1,Y) :- field(X;X+1,Y)."
 -- parse rule "" "forth(J,NI+1,S-M) :- done(L,S), reach(J,NJ,M), forth(I,NI,S-(M+1)), NI = L-(NJ+1),\n           link(I,J,V),     leaking(V)."
+-- parse rule "" "border((N-1)*R+1) :- number(N), sqrt(R), N<=R."
 
 rule :: GenParser Char st Rules    
 rule    = do { 
