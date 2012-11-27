@@ -58,23 +58,39 @@ ones, e.g. #mod -> mod.
 At times the parser may be more liberal than the lparse one,
 e.g. minimize { a(X), b(Y) } will be accepted. 
 
-3. Other documentation 		
+3. Self tests 
+
+Compile the parser test suite and run it:
+> ghc -o runparsertests testaspparse.hs aspparse.hs 
+> ./runparsertests 
+
+4. Use cases 
+
+4.1 Metaevaluation 
+
+The directory metaeval/ contains some example programs to show potential
+applications for reification. metaeval/simple_variable_free.lp contains a 
+simplistic program with no variables. 
+1. Reify the program: ./aspreify metaeval/simple_variable_free.lp
+   to produce metaeval/simple_variable_free.lp.reified 
+2. Combine the metaevaluator with the reified program: 
+   cat metaeval/meta.lp metaeval/simple_variable_free.lp.reified > metaeval/x.lp
+3. Calculate the answer sets: smodels metaeval/x.lp | smodels 0 
+   Compare this with direct evaluation: lparse metaeval/simple_variable_free.lp | smodels 0
+   Or with gringo metaeval/x.lp | clasp -n 0 
+
+5. Other
+
+The toviz.py program reads in the reified program and generates a
+graphviz graph out of it. 
+
+6. TODO
 
 TODO
 - List the produced factnames and the documentation for them
 - add full rendering of all directives of the lparse/gringo language
 - have a look at quickcheck  
 
-4. Self tests 
-
-Compile the parser test suite and run it:
-> ghc -o runparsertests testaspparse.hs aspparse.hs 
-> ./runparsertests 
-
-5. Other
-
-The toviz.py program reads in the reified program and generates a
-graphviz graph out of it. 
 
 #EOF
 
