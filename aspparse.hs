@@ -885,6 +885,7 @@ atomm    = do { r <- atom; return (r,[])}
 -- name and a list of arguments. We cheat and use
 -- 'srel'. 
 -- parse func "" "#abs(N,N+1)"
+-- parse func "" "foo()"
 func :: GenParser Char st MyExpr
 {--
 func    = do {
@@ -928,7 +929,7 @@ func    = do {n <- atom; many space;
 -- parse genrel "" "foo(X..Y)"
 -- parse genrel "" "{  sat(C) : clause(C) } k*1"
 -- parse genrel "" "border((N-1)*R+1,N)." 
--- parse genrel "" "dist(#abs(RK1-RK2))
+-- parse genrel "" "dist(#abs(RK1-RK2))"
 genrel :: GenParser Char st Body
 genrel    = 
             try(myassign) <|> 
@@ -981,7 +982,6 @@ body    = do (sepBy genrel (skipMany1 (space <|> char ',')))
 -- parse rule "" "ready(A) :- \"rdf:type\" A,\"wp1:Activity\"), not missing_commit(A)." -- should fail
 -- parse rule "" "time(M..N)     :- mintime(M), maxtime(N)." -- OK
 -- parse rule "" "ests(M..N+P) :- M = #min [ est(I,S) : est(I,S) : hasest(I) = S ],\nN = #max [ est(J,T) : est(J,T) : hasest(J) = T ], sest(P), est." -- OK
--- parse rule "" "dist(#abs(RK1-RK2)) :- restaurant(RN1,RK1), restaurant(RN2,RK2)." -- NOK, Abs
 -- parse rule "" "1 { pos(N,L,T) : L = 1..X : T = 1..Y } 1 :- net(N), layers(X), tracks(Y)." -- NOK
 -- parse rule "" "dneighbor(n,X,Y,X+1,Y) :- field(X;X+1,Y)."
 -- parse rule "" "forth(J,NI+1,S-M) :- done(L,S), reach(J,NJ,M), forth(I,NI,S-(M+1)), NI = L-(NJ+1),\n           link(I,J,V),     leaking(V)."
@@ -1284,7 +1284,11 @@ threerule = do {
 -- parse rulebase "" "1 { maps_to(X, U) } 1 :- vtx_G(X)."
 
 -- parse rulebase "" "ready(A) :- \"rdf:type\"(A,\"wp1:Activity\"), not missing_commit(A)."
+-- parse rulebase "" "hasrule(1,2).\nrule(2).\npos(3).\nhead(2,3).\npred(3,\"oncycle\").var(4,\"X\").\nalist(3,1,4).\nvar(5,\"Y\").\nalist(3,2,5).\nneg(6).\nbody(2,6).\npred(6,\"other\").\nvar(7,\"X\").alist(6,1,7).var(8,\"Y\").alist(6,2,8).pos(9).body(2,9).pred(9,\"edge\").var(10,\"X\").alist(9,1,10).var(11,\"Y\").alist(9,2,11)."
+-- Right [Fact [Plain (Const "hasrule") [Number (Const "1"),Number (Const "2")] True],Fact [Plain (Const "rule") [Number (Const "2")] True],Fact [Plain (Const "pos") [Number (Const "3")] True],Fact [Plain (Const "head") [Number (Const "2"),Number (Const "3")] True],Fact [Plain (Const "pred") [Number (Const "3"),Sym (Const "\"oncycle\"")] True],Fact [Plain (Const "var") [Number (Const "4"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "3"),Number (Const "1"),Number (Const "4")] True],Fact [Plain (Const "var") [Number (Const "5"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "alist") [Number (Const "3"),Number (Const "2"),Number (Const "5")] True],Fact [Plain (Const "neg") [Number (Const "6")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "6")] True],Fact [Plain (Const "pred") [Number (Const "6"),Sym (Const "\"other\"")] True],Fact [Plain (Const "var") [Number (Const "7"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "6"),Number (Const "1"),Number (Const "7")] True],Fact [Plain (Const "var") [Number (Const "8"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "alist") [Number (Const "6"),Number (Const "2"),Number (Const "8")] True],Fact [Plain (Const "pos") [Number (Const "9")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "9")] True],Fact [Plain (Const "pred") [Number (Const "9"),Sym (Const "\"edge\"")] True],Fact [Plain (Const "var") [Number (Const "10"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "9"),Number (Const "1"),Number (Const "10")] True],Fact [Plain (Const "var") [Number (Const "11"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "alist") [Number (Const "9"),Number (Const "2"),Number (Const "11")] True]]
 
+-- parse rulebase "" "hasrule(1,2).\nrule(2).\npos(3).\nhead(2,3).\nneg(6).\nbody(2,6).pos(9).body(2,9)."
+-- Right [Fact [Plain (Const "hasrule") [Number (Const "1"),Number (Const "2")] True],Fact [Plain (Const "rule") [Number (Const "2")] True],Fact [Plain (Const "pos") [Number (Const "3")] True],Fact [Plain (Const "head") [Number (Const "2"),Number (Const "3")] True],Fact [Plain (Const "neg") [Number (Const "6")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "6")] True],Fact [Plain (Const "pos") [Number (Const "9")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "9")] True]]
 
 -- rule = header >> string ":-" >> body
 
