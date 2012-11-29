@@ -8,13 +8,13 @@ the input program as ASP facts, effectively reifying the input program
 allowing, among other things, ASP programs to be interpreted or
 modified by other ASP programs.
 
-Vesa Luukkala (vesa.luukkala@gmail.com), 20.10.2012 
+Vesa Luukkala (vesa.luukkala@gmail.com), 29.11.2012 
 
 1. Building 
 
 Requires Haskell platform (http://www.haskell.org/platform/), tested on 2012.2.0.0. 
 To produce an executable:
-> ghc -o aspreify main.hs rdfrender.hs txtrender.hs factrender.hs aspparse.hs 
+> ghc -o aspreify main.hs rdfrender.hs txtrender.hs factrender.hs aspparse.hs dereify.hs
 
 Obtain the sources initially:
 > git clone git://www.github.com/vluukkal/aspreify
@@ -66,18 +66,33 @@ Compile the parser test suite and run it:
 
 4. Use cases 
 
+The directory metaeval/ contains some example programs to show potential
+applications for reification. 
+
 4.1 Metaevaluation 
 
-The directory metaeval/ contains some example programs to show potential
-applications for reification. metaeval/simple_variable_free.lp contains a 
-simplistic program with no variables. 
+metaeval/simple_variable_free.lp contains a simplistic program with no variables
+and metaeval/meta.lp contains a metaevaluator for variable-free answer set programs. 
+
 1. Reify the program: ./aspreify metaeval/simple_variable_free.lp
    to produce metaeval/simple_variable_free.lp.reified 
 2. Combine the metaevaluator with the reified program: 
    cat metaeval/meta.lp metaeval/simple_variable_free.lp.reified > metaeval/x.lp
-3. Calculate the answer sets: smodels metaeval/x.lp | smodels 0 
+3. Calculate the answer sets: gringo metaeval/x.lp | clasp -n 0 
    Compare this with direct evaluation: lparse metaeval/simple_variable_free.lp | smodels 0
    Or with gringo metaeval/x.lp | clasp -n 0 
+
+4.2 Metagrounding 
+
+metaeval/hamilton.lp contains an answer set program with variables and metaeval/metaground.lp 
+contains a metagrounder. 
+
+1. Reify the program: ./aspreify metaeval/hamilton.lp
+   to produce metaeval/hamilton.lp.reified 
+2. Combine the metagrounder with the reified program: 
+   cat metaeval/metaground.lp metaeval/hamilton.lp.reified > metaeval/y.lp
+3. Calculate the answer sets: gringo metaeval/y.lp | clasp -n 0 
+   with 63 answer sets, realassign/3 contains the variable assignments. 
 
 5. Other
 

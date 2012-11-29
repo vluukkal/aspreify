@@ -62,6 +62,7 @@ import AspParse
 import FactRender
 import TxtRender
 import RdfRender
+import DeReify
 
 parsenrender :: String -> ((Either ParseError [Rules]) -> String) -> IO String
 parsenrender fname renderer = 
@@ -124,11 +125,16 @@ reify fn1 fn2 params =
     do 
       parsenrendernwrite fn1 fn2 (factrender ("% Inputfile: " ++ fn1 ++ "\n") params)
 
+undoreify fn1 fn2 =
+    do 
+      parsenrendernwrite fn1 fn2 dereify
+
 data Flag
     = Lparse                -- -l (default)
     | Rdf                   -- -r
     | Test                  -- -t
     | Idreuse               -- -i
+    | Dereify               -- -d 
     | Help                  -- --help
     deriving (Eq,Ord,Enum,Show,Bounded)
 
@@ -141,6 +147,8 @@ flags =
         "Renders the parsetree back to text, useful for testing."
    ,Option ['i'] []       (NoArg Idreuse)
         "Assigns the same identifier for same variable in one rule."
+   ,Option ['d'] []       (NoArg Dereify)
+        "Reads in a reified set of facts and constructs reconstructs nonreified ruleset."
    ,Option []    ["help"] (NoArg Help)
         "Print this help message"
    ]
@@ -156,10 +164,11 @@ parseopts argv =
    (_,_,errs)      -> do
         System.IO.hPutStrLn stderr (List.concat errs ++ usageInfo header flags)
         exitWith (ExitFailure 1)
-   where header = "Usage: aspparse [-l|r|t] [file ...]"
+   where header = "Usage: aspparse [-l|r|t|d] [file ...]"
          set Lparse      = [Lparse] 
          set Rdf      = [Rdf] 
          set Test      = [Test] 
+         set Dereify      = [Dereify] 
          set f      = [f] 
 
 handleafile otype other f = 
@@ -173,6 +182,10 @@ handleafile otype other f =
        let loopbackfile = (f ++ ".lp") 
        -- putStrLn ("backtolp " ++ show(f) ++ " " ++ show(loopbackfile))
        backtolp f loopbackfile
+ [Dereify] -> do 
+      let dereifiedfile = (f ++ ".dereified") 
+      undoreify f dereifiedfile
+      
  _ -> do -- default is [Lparse]
       let reifiedfile = (f ++ ".reified") 
       -- putStrLn ("reify " ++ show(f) ++ " " ++ show(reifiedfile))
@@ -186,13 +199,14 @@ separateargs args =
   where onlytypes x | x == Rdf = True
                     | x == Lparse = True 
                     | x == Test = True
+                    | x == Dereify = True
                     | otherwise = False  
 
 main = 
     do 
       (args,files) <- getArgs >>= parseopts
       let (outputtype,other) = separateargs args 
-      -- putStrLn ((show outputtype) ++ "," ++ (show other))
+      -- System.IO.putStrLn ((show outputtype) ++ "," ++ (show other))
       -- The exclusivity must be somewhere in getopt though 
       if List.length outputtype > 1 
       then do System.IO.hPutStrLn stderr ("Only one output type permitted\n" ++ (usageInfo header flags))
@@ -200,4 +214,4 @@ main =
       else do mapM_ (handleafile outputtype other) files 
               exitWith ExitSuccess
 
-      where header = "Usage: aspparse [-l|r|t] [file ...]"
+      where header = "Usage: aspparse [-l|r|t|d] [file ...]"
