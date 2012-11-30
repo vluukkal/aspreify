@@ -1290,6 +1290,16 @@ threerule = do {
 -- parse rulebase "" "hasrule(1,2).\nrule(2).\npos(3).\nhead(2,3).\nneg(6).\nbody(2,6).pos(9).body(2,9)."
 -- Right [Fact [Plain (Const "hasrule") [Number (Const "1"),Number (Const "2")] True],Fact [Plain (Const "rule") [Number (Const "2")] True],Fact [Plain (Const "pos") [Number (Const "3")] True],Fact [Plain (Const "head") [Number (Const "2"),Number (Const "3")] True],Fact [Plain (Const "neg") [Number (Const "6")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "6")] True],Fact [Plain (Const "pos") [Number (Const "9")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "9")] True]]
 
+-- reached(1).
+-- parse rulebase "" "hasrule(1,40).assert(40).pos(41).head(40,41).pred(41,\"reached\").cnst(42,\"1\").alist(41,1,42)."
+-- Right [Fact [Plain (Const "hasrule") [Number (Const "1"),Number (Const "40")] True],Fact [Plain (Const "assert") [Number (Const "40")] True],Fact [Plain (Const "pos") [Number (Const "41")] True],Fact [Plain (Const "head") [Number (Const "40"),Number (Const "41")] True],Fact [Plain (Const "pred") [Number (Const "41"),Sym (Const "\"reached\"")] True],Fact [Plain (Const "cnst") [Number (Const "42"),Sym (Const "\"1\"")] True],Fact [Plain (Const "alist") [Number (Const "41"),Number (Const "1"),Number (Const "42")] True]]
+
+-- parse rulebase "" "other(X , Y) :- edge(X , Y) , Y != Z." 
+-- Right [Rule (Plain (Const "other") [Sym (Var "X"),Sym (Var "Y")] True) [Plain (Const "edge") [Sym (Var "X"),Sym (Var "Y")] True,BExpr Neq (Sym (Var "Y")) (Sym (Var "Z"))]]
+
+-- parse rulebase "" "hasrule(1,2).rule(2).pos(3).head(2,3).pred(3,\"other\").var(4,\"X\").alist(3,1,4).var(5,\"Y\").alist(3,2,5).bexpr(2,6).bop(6,\"!=\").larg(6,7).var(7,\"Y\").rarg(6,8).var(8,\"Z\").pos(9).body(2,9).pred(9,\"edge\").var(10,\"X\").alist(9,1,10).var(11,\"Y\").alist(9,2,11)." 
+-- Right [Fact [Plain (Const "hasrule") [Number (Const "1"),Number (Const "2")] True],Fact [Plain (Const "rule") [Number (Const "2")] True],Fact [Plain (Const "pos") [Number (Const "3")] True],Fact [Plain (Const "head") [Number (Const "2"),Number (Const "3")] True],Fact [Plain (Const "pred") [Number (Const "3"),Sym (Const "\"other\"")] True],Fact [Plain (Const "var") [Number (Const "4"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "3"),Number (Const "1"),Number (Const "4")] True],Fact [Plain (Const "var") [Number (Const "5"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "alist") [Number (Const "3"),Number (Const "2"),Number (Const "5")] True],Fact [Plain (Const "bexpr") [Number (Const "2"),Number (Const "6")] True],Fact [Plain (Const "bop") [Number (Const "6"),Sym (Const "\"!=\"")] True],Fact [Plain (Const "larg") [Number (Const "6"),Number (Const "7")] True],Fact [Plain (Const "var") [Number (Const "7"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "rarg") [Number (Const "6"),Number (Const "8")] True],Fact [Plain (Const "var") [Number (Const "8"),Sym (Const "\"Z\"")] True],Fact [Plain (Const "pos") [Number (Const "9")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "9")] True],Fact [Plain (Const "pred") [Number (Const "9"),Sym (Const "\"edge\"")] True],Fact [Plain (Const "var") [Number (Const "10"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "9"),Number (Const "1"),Number (Const "10")] True],Fact [Plain (Const "var") [Number (Const "11"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "alist") [Number (Const "9"),Number (Const "2"),Number (Const "11")] True]]
+
 -- rule = header >> string ":-" >> body
 
 -- The actual call to the parser is in 
@@ -1375,6 +1385,19 @@ unbop op =
       Eq -> "="
       Neq -> "!="
       Eqeq -> "=="
+
+-- Sometimes it is useful to do the reverse
+tobop op = 
+    case op of 
+      ">" -> Gt
+      "<" -> Lt
+      ">=" -> GtEq 
+      "<=" -> LtEq 
+      "=" -> Eq
+      "!=" -> Neq 
+      "==" -> Eqeq
+      otherwise -> Eq -- !
+
 {--
 unarith op a1 a2 = 
     (unmyexpr a1) ++ " " ++  (unop op) ++ " " ++ (unmyexpr a2)
