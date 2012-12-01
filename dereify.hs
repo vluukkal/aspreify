@@ -58,10 +58,15 @@ data IntermediateR = IntermediateR {
      predsh      :: (M.Map String [String]),
      varsh      :: (M.Map String [String]),
      alisth     :: (M.Map String [(String,String)]),
+     tlisth     :: (M.Map String [(String,String)]),
      typeh      :: (M.Map String String),
+     quals      :: (M.Map String String),
+     composedh  :: (M.Map String String),
      boph      :: (M.Map String String),
      largh      :: (M.Map String String),
      rargh      :: (M.Map String String),
+     mkassigns  :: (M.Map String (M.Map String String)),
+     rassigns  ::  (M.Map String String),
      -- 
      denialsh    :: (M.Map String [String]),
      factsh      :: (M.Map String [String]),
@@ -128,6 +133,7 @@ assigntohash hs nm bdy neg =
                         hs { typeh = newhs }
        --}
       "rule" ->  addtype bdy nm 0
+      "composite" ->  addtype bdy nm 0
       "constraint" -> addtype bdy nm 0
       "assert" -> addtype bdy nm 0
       "head" -> let src = getarg bdy 0 in 
@@ -135,6 +141,11 @@ assigntohash hs nm bdy neg =
                 let tmphs = headsh hs in 
                 let newhs = M.insertWith (++) src [trgt] tmphs in
                        hs { headsh = newhs }
+      "qual" -> let src = getarg bdy 0 in 
+                let trgt = getarg bdy 1 in 
+                let tmphs = quals hs in 
+                let newhs = M.insertWith (++) src trgt tmphs in
+                       hs { quals = newhs }
       "bexpr" -> let src = getarg bdy 0 in 
                  let trgt = getarg bdy 1 in 
                  let hs' = addtype bdy nm 1 in 
@@ -196,6 +207,22 @@ assigntohash hs nm bdy neg =
                   let tmphs = alisth hs in 
                   let newhs = M.insertWith (++) src [(idx,trgt)] tmphs in
                        hs { alisth = newhs }
+      "mkassign" ->  let rn = getarg bdy 0 in 
+                  let varn = getarg bdy 1 in 
+                  let varval = getarg bdy 2 in 
+                  let tmphs = mkassigns hs in 
+                  let tmpins = M.insert varn varval M.empty in 
+                  let newhs = M.insertWith updvr rn tmpins tmphs in 
+                       hs { mkassigns = newhs }
+                  where 
+                      updvr :: Ord k => M.Map k a -> M.Map k a -> M.Map k a
+                      updvr newh oldh = M.union oldh newh
+      "tlist" ->  let src = getarg bdy 0 in 
+                  let idx = getarg bdy 1 in 
+                  let trgt = getarg bdy 2 in 
+                  let tmphs = tlisth hs in 
+                  let newhs = M.insertWith (++) src [(idx,trgt)] tmphs in
+                       hs { tlisth = newhs }
       otherwise -> let tmphs = emptyh hs in 
                    let newhs = M.insert nm [""] tmphs in
                        hs { emptyh = newhs }
@@ -243,16 +270,24 @@ pull i =
 crulebase hash key v accu = 
     L.foldr (citem hash) [] v 
 
+getrulevars h k = 
+   let vars = M.lookup k (mkassigns h) in 
+   case vars of 
+        Just r -> h { rassigns = r } 
+        Nothing -> h 
+
 citem :: IntermediateR -> String -> [Rules] -> [Rules]
 citem hash key accu = 
-   let tp = M.lookup key (typeh hash) in 
+   let hash' = getrulevars hash key in 
+   let tp = M.lookup key (typeh hash') in 
    case tp of 
-        Just "rule" -> crule hash key accu 
-        Just "constraint" -> cconstraint hash key accu 
-        Just "assert" -> cassert hash key accu 
-        Just x -> (Deny [Plain (Const ("Error: unknown item: "++ x )) [] True]):accu 
+        Just "rule" -> crule hash' key accu 
+        Just "constraint" -> cconstraint hash' key accu 
+        Just "assert" -> cassert hash' key accu 
+        -- Just "composite" -> cassert hash key accu 
+        Just x -> (Deny [Plain (Const ("Error at citem: unknown item: "++ x )) [] True]):accu 
         Nothing -> -- accu 
-                (Deny [Plain (Const ("Error: unknown ID: "++key )) [] True]):accu 
+                (Deny [Plain (Const ("Error at citem: unknown ID: "++key )) [] True]):accu 
 
 crule :: IntermediateR -> String -> [Rules] -> [Rules]
 crule hash key accu = 
@@ -265,11 +300,6 @@ crule hash key accu =
    let bdls = L.foldr (cbody hash) [] bdks in 
        ((Rule hdc bdls):accu)
        -- (hdc:accu)
-
--- Get all of the IDs which may be in the body 
--- of a rule. 
--- crulebodies hash key =
-    
 
 cconstraint hash key accu = 
    -- Unsafe, will raise exception if no such key, aka
@@ -318,22 +348,46 @@ chead h k =
 cbody h k accu = 
       (cpred h k):accu
 --}
+cbody :: IntermediateR -> String -> [Body] -> [Body]
 cbody hash key accu = 
    let tp = M.lookup key (typeh hash) in 
    case tp of 
         Just "bexpr" -> cbexpr hash key accu 
         Just "pred" -> (cpred hash key):accu 
+        Just "composite" -> (ctlist hash key):accu -- let nxt = ( hash) M.! key 
         Nothing -> -- accu 
-                (Plain (Const ("Error: unknown ID: "++key )) [] True):accu 
+                (Plain (Const ("Error at cbody: unknown ID: "++key )) [] True):accu 
+
+ctlist :: IntermediateR -> String -> Body
+ctlist h k = 
+    let args = (tlisth h) M.! k in 
+    let args' = L.foldr (targl h) [] args in -- [(idx,id)] to [(idx,Body)]
+    let oargs = L.sortBy myc args' in -- order by index 
+    let (_,oargs') = L.unzip oargs in -- We need to translate [(idx,Body)] to [Body]
+      (Typed oargs')
+    where 
+      myc (i1,v1) (i2,v2) = i1 `compare` i2
+
+targl h (idx,v) accu = 
+    let tmp = (quals h) in 
+    let nxt = tmp M.! v in 
+    let nxtb = cbody h nxt [] in 
+        (idx,L.head(nxtb)):accu
+
+targl' h (idx,v) accu = 
+    let tmp = (quals h) in 
+    let nxt = tmp M.! v in 
+    let nxtb = Plain (Const nxt) [] True in 
+        (idx,nxtb):accu
 
 
 cpred :: IntermediateR -> String -> Body
 cpred h k = 
     let pn = (predsh h) M.! k in 
     let args = (alisth h) M.! k in 
-    let args' = L.foldr (argl h) [] args in 
+    let args' = L.foldr (argl h) [] args in -- We need to translate [(idx,Atom)] to [MyExpr]
     let oargs = L.sortBy myc args' in -- order by index 
-    let (_,oargs') = L.unzip oargs in -- We need to translate [(idx,Atom)] to [MyExpr]
+    let (_,oargs') = L.unzip oargs in 
     -- let oargs'' = L.map (\i -> (Sym i)) oargs' in     
     -- let oargs'' = L.map (\i -> (cexpr h) i ) oargs' in     
     -- let oargs'' = L.map (cexpr h) oargs' in     
@@ -376,18 +430,35 @@ cexpr hash key =
         Nothing -> (Sym (Const ("cexpr error unknown key: " ++ key)))
 
 
+-- This is where we may ground a variable,
+-- if the rassign hash is nonempty and has
+-- the given variable, we return a Cnst 
+-- instead of var. 
+ground hash vname = 
+   let boundvars = (rassigns hash) in 
+   let val = M.lookup vname boundvars in 
+   case val of 
+        Just cnst -> (Sym (Const (rmquot cnst)))
+        Nothing -> (Sym (Var (rmquot vname)))
+
+
 cvar hash key  = 
-   -- Unsafe, will raise exception if no such key, aka
-   -- incomplete refied file ...
+   let hdk = M.lookup key (varsh hash) in 
+   case hdk of 
+        Just vname -> ground hash (L.head vname)
+        Nothing -> (Sym (Const ("Error no variable ID:" ++ show(key))))
+{--
    let hdk = (varsh hash) M.! key in 
        -- ((Sym (Var (L.head hdk))):accu)
        (Sym (Var (rmquot (L.head hdk))))
+--}
 
 cconst hash key = 
    -- Unsafe, will raise exception if no such key, aka
    -- incomplete refied file ...
    let hdk = (constsh hash) M.! key in 
-       (Number (Const (rmquot (L.head hdk))))
+       -- (Number (Const (rmquot (L.head hdk))))
+       (Sym (Const (rmquot (L.head hdk))))
 
 {--
 argl h (idx,v) accu = 
@@ -416,7 +487,7 @@ rmquot s =
 -- other(X , Y) :- edge(X , Y) , Y != Z.
 -- Right [Rule (Plain (Const "other") [Sym (Var "X"),Sym (Var "Y")] True) [Plain (Const "edge") [Sym (Var "X"),Sym (Var "Y")] True,BExpr Neq (Sym (Var "Y")) (Sym (Var "Z"))]]
 -- dereify' (Right [Fact [Plain (Const "hasrule") [Number (Const "1"),Number (Const "2")] True],Fact [Plain (Const "rule") [Number (Const "2")] True],Fact [Plain (Const "pos") [Number (Const "3")] True],Fact [Plain (Const "head") [Number (Const "2"),Number (Const "3")] True],Fact [Plain (Const "pred") [Number (Const "3"),Sym (Const "\"other\"")] True],Fact [Plain (Const "var") [Number (Const "4"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "3"),Number (Const "1"),Number (Const "4")] True],Fact [Plain (Const "var") [Number (Const "5"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "alist") [Number (Const "3"),Number (Const "2"),Number (Const "5")] True],Fact [Plain (Const "bexpr") [Number (Const "2"),Number (Const "6")] True],Fact [Plain (Const "bop") [Number (Const "6"),Sym (Const "\"!=\"")] True],Fact [Plain (Const "larg") [Number (Const "6"),Number (Const "7")] True],Fact [Plain (Const "var") [Number (Const "7"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "rarg") [Number (Const "6"),Number (Const "8")] True],Fact [Plain (Const "var") [Number (Const "8"),Sym (Const "\"Z\"")] True],Fact [Plain (Const "pos") [Number (Const "9")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "9")] True],Fact [Plain (Const "pred") [Number (Const "9"),Sym (Const "\"edge\"")] True],Fact [Plain (Const "var") [Number (Const "10"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "9"),Number (Const "1"),Number (Const "10")] True],Fact [Plain (Const "var") [Number (Const "11"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "alist") [Number (Const "9"),Number (Const "2"),Number (Const "11")] True]])
-
+-- dereify' (Right [Fact [Plain (Const "hasrule") [Number (Const "1"),Number (Const "2")] True],Fact [Plain (Const "constraint") [Number (Const "2")] True],Fact [Plain (Const "pos") [Number (Const "3")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "3")] True],Fact [Plain (Const "pred") [Number (Const "3"),Sym (Const "\"node\"")] True],Fact [Plain (Const "var") [Number (Const "4"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "3"),Number (Const "1"),Number (Const "4")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "5")] True],Fact [Plain (Const "composite") [Number (Const "5")] True],Fact [Plain (Const "tlist") [Number (Const "5"),Number (Const "1"),Number (Const "6")] True],Fact [Plain (Const "neg") [Number (Const "7")] True],Fact [Plain (Const "qual") [Number (Const "6"),Number (Const "7")] True],Fact [Plain (Const "pred") [Number (Const "7"),Sym (Const "\"oncycle\"")] True],Fact [Plain (Const "var") [Number (Const "8"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "alist") [Number (Const "7"),Number (Const "1"),Number (Const "8")] True],Fact [Plain (Const "var") [Number (Const "9"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "7"),Number (Const "2"),Number (Const "9")] True],Fact [Plain (Const "tlist") [Number (Const "5"),Number (Const "2"),Number (Const "10")] True],Fact [Plain (Const "pos") [Number (Const "11")] True],Fact [Plain (Const "qual") [Number (Const "10"),Number (Const "11")] True],Fact [Plain (Const "pred") [Number (Const "11"),Sym (Const "\"edge\"")] True],Fact [Plain (Const "var") [Number (Const "12"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "alist") [Number (Const "11"),Number (Const "1"),Number (Const "12")] True],Fact [Plain (Const "var") [Number (Const "13"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "11"),Number (Const "2"),Number (Const "13")] True]])
 -- 
 
 dereify' :: Either ParseError [Rules] -> ([Rules], IntermediateR)
@@ -425,7 +496,8 @@ dereify' rb =
        rulesh = M.empty, hasrulesh = M.empty, 
        headsh = M.empty, bodysh = M.empty, posh = M.empty, negh = M.empty,
        predsh = M.empty, varsh = M.empty, alisth = M.empty, typeh = M.empty, 
-       largh = M.empty, rargh = M.empty, boph = M.empty,
+       largh = M.empty, rargh = M.empty, boph = M.empty, tlisth = M.empty, 
+       quals = M.empty, composedh = M.empty, mkassigns = M.empty, rassigns = M.empty,
        -- 
        denialsh = M.empty, factsh = M.empty, showsh = M.empty, gshowsh = M.empty,
        hidesh = M.empty, ghidesh = M.empty, externalsh = M.empty, functionsh = M.empty, 
@@ -451,7 +523,8 @@ dereify'' rb =
        rulesh = M.empty, hasrulesh = M.empty, 
        headsh = M.empty, bodysh = M.empty, posh = M.empty, negh = M.empty,
        predsh = M.empty, varsh = M.empty, alisth = M.empty, typeh = M.empty, 
-       largh = M.empty, rargh = M.empty, boph = M.empty,
+       largh = M.empty, rargh = M.empty, boph = M.empty,tlisth = M.empty, 
+       quals = M.empty, composedh = M.empty, mkassigns = M.empty, rassigns = M.empty,
        -- 
        denialsh = M.empty, factsh = M.empty, showsh = M.empty, gshowsh = M.empty,
        hidesh = M.empty, ghidesh = M.empty, externalsh = M.empty, functionsh = M.empty, 
@@ -472,5 +545,5 @@ dereify'' rb =
 dereify :: Either ParseError [Rules] -> String 
 dereify x = 
     let (y,hs) = dereify' x in 
-    txtrender ((Right y)::(Either ParseError [Rules]))
+    txtrender ((Right (L.reverse y))::(Either ParseError [Rules]))
 
