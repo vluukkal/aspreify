@@ -48,6 +48,7 @@ import TxtRender
 -- one. May pay off if the facts are coming in modified order from ASP tools. 
 -- We get automatically getter functions named after the fields. 
 data IntermediateR = IntermediateR {
+     doground :: Bool, 
      -- The hashes for rules
      hasrulesh      :: (M.Map String [String]),
      rulesh      :: (M.Map String [String]),
@@ -68,6 +69,11 @@ data IntermediateR = IntermediateR {
      mkassigns  :: (M.Map String (M.Map String String)),
      rassigns  ::  (M.Map String String),
      -- 
+     bexprh      :: (M.Map String [String]), 
+     constsh     :: (M.Map String [String]),
+     emptyh      :: (M.Map String [String])
+
+     {-- 
      denialsh    :: (M.Map String [String]),
      factsh      :: (M.Map String [String]),
      showsh      :: (M.Map String [String]),
@@ -78,7 +84,6 @@ data IntermediateR = IntermediateR {
      functionsh :: (M.Map String [String]),
      minimizesh  :: (M.Map String [String]),
      maximizesh  :: (M.Map String [String]),
-     constsh     :: (M.Map String [String]),
      computesh   :: (M.Map String [String]), 
      -- The hashes for Body
      plainh      :: (M.Map String [String]), 
@@ -87,11 +92,9 @@ data IntermediateR = IntermediateR {
      optimizeh      :: (M.Map String [String]), 
      typedh      :: (M.Map String [String]), 
      weighedh      :: (M.Map String [String]), 
-     bexprh      :: (M.Map String [String]), 
      assignh      :: (M.Map String [String]), 
      assignmenth      :: (M.Map String [String]), 
      arityh      :: (M.Map String [String]), 
-     emptyh      :: (M.Map String [String]), 
      -- MyExpr stuff 
      numberh :: (M.Map String [String]), 
      symh :: (M.Map String [String]), 
@@ -101,6 +104,7 @@ data IntermediateR = IntermediateR {
      -- Operations are not recorded
      atomh :: (M.Map String [String]), 
      consth :: (M.Map String [String])
+     --}
 } deriving (Show)
 
 collectb :: t -> t1 -> Body
@@ -273,14 +277,19 @@ crulebase hash key v accu =
 getrulevars h k = 
    let vars = M.lookup k (mkassigns h) in 
    case vars of 
-        Just r -> h { rassigns = r } 
+        Just r -> if (doground h) then  (h { rassigns = r }) else h
         Nothing -> h 
 
 citem :: IntermediateR -> String -> [Rules] -> [Rules]
 citem hash key accu = 
    let hash' = getrulevars hash key in 
-   let tp = M.lookup key (typeh hash') in 
-   case tp of 
+   if (M.null (rassigns hash')) && (doground hash') 
+   then accu 
+   else 
+     -- Ugh, cake on cake here
+     -- let hash' = if (doground hash') then hash' else (hash' { rassigns = M.empty }) in 
+     let tp = M.lookup key (typeh hash') in 
+     case tp of 
         Just "rule" -> crule hash' key accu 
         Just "constraint" -> cconstraint hash' key accu 
         Just "assert" -> cassert hash' key accu 
@@ -447,11 +456,6 @@ cvar hash key  =
    case hdk of 
         Just vname -> ground hash (L.head vname)
         Nothing -> (Sym (Const ("Error no variable ID:" ++ show(key))))
-{--
-   let hdk = (varsh hash) M.! key in 
-       -- ((Sym (Var (L.head hdk))):accu)
-       (Sym (Var (rmquot (L.head hdk))))
---}
 
 cconst hash key = 
    -- Unsafe, will raise exception if no such key, aka
@@ -490,15 +494,18 @@ rmquot s =
 -- dereify' (Right [Fact [Plain (Const "hasrule") [Number (Const "1"),Number (Const "2")] True],Fact [Plain (Const "constraint") [Number (Const "2")] True],Fact [Plain (Const "pos") [Number (Const "3")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "3")] True],Fact [Plain (Const "pred") [Number (Const "3"),Sym (Const "\"node\"")] True],Fact [Plain (Const "var") [Number (Const "4"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "3"),Number (Const "1"),Number (Const "4")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "5")] True],Fact [Plain (Const "composite") [Number (Const "5")] True],Fact [Plain (Const "tlist") [Number (Const "5"),Number (Const "1"),Number (Const "6")] True],Fact [Plain (Const "neg") [Number (Const "7")] True],Fact [Plain (Const "qual") [Number (Const "6"),Number (Const "7")] True],Fact [Plain (Const "pred") [Number (Const "7"),Sym (Const "\"oncycle\"")] True],Fact [Plain (Const "var") [Number (Const "8"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "alist") [Number (Const "7"),Number (Const "1"),Number (Const "8")] True],Fact [Plain (Const "var") [Number (Const "9"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "7"),Number (Const "2"),Number (Const "9")] True],Fact [Plain (Const "tlist") [Number (Const "5"),Number (Const "2"),Number (Const "10")] True],Fact [Plain (Const "pos") [Number (Const "11")] True],Fact [Plain (Const "qual") [Number (Const "10"),Number (Const "11")] True],Fact [Plain (Const "pred") [Number (Const "11"),Sym (Const "\"edge\"")] True],Fact [Plain (Const "var") [Number (Const "12"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "alist") [Number (Const "11"),Number (Const "1"),Number (Const "12")] True],Fact [Plain (Const "var") [Number (Const "13"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "11"),Number (Const "2"),Number (Const "13")] True]])
 -- 
 
-dereify' :: Either ParseError [Rules] -> ([Rules], IntermediateR)
-dereify' rb = 
+dereify' :: Either ParseError [Rules] -> Bool -> ([Rules], IntermediateR)
+dereify' rb ground = 
    let hs = IntermediateR {
+       -- doground = True, 
+       doground = ground, 
        rulesh = M.empty, hasrulesh = M.empty, 
        headsh = M.empty, bodysh = M.empty, posh = M.empty, negh = M.empty,
        predsh = M.empty, varsh = M.empty, alisth = M.empty, typeh = M.empty, 
        largh = M.empty, rargh = M.empty, boph = M.empty, tlisth = M.empty, 
        quals = M.empty, composedh = M.empty, mkassigns = M.empty, rassigns = M.empty,
-       -- 
+       bexprh = M.empty, constsh = M.empty, emptyh = M.empty
+       {-- 
        denialsh = M.empty, factsh = M.empty, showsh = M.empty, gshowsh = M.empty,
        hidesh = M.empty, ghidesh = M.empty, externalsh = M.empty, functionsh = M.empty, 
        minimizesh = M.empty, maximizesh = M.empty, constsh = M.empty, computesh = M.empty, 
@@ -506,6 +513,7 @@ dereify' rb =
        weighedh = M.empty, bexprh = M.empty, assignh = M.empty, assignmenth = M.empty, 
        arityh = M.empty, emptyh = M.empty, numberh = M.empty, symh = M.empty, 
        alternativeh = M.empty, arithh = M.empty, funch = M.empty, atomh = M.empty, consth = M.empty
+       --}
     } in 
    case rb of 
         Left l -> ([],hs) -- [Empty] -- [Left l]
@@ -520,12 +528,14 @@ dereify' rb =
 dereify'' :: Either ParseError [Rules] -> IntermediateR
 dereify'' rb = 
    let hs = IntermediateR {
+       doground = True, 
        rulesh = M.empty, hasrulesh = M.empty, 
        headsh = M.empty, bodysh = M.empty, posh = M.empty, negh = M.empty,
        predsh = M.empty, varsh = M.empty, alisth = M.empty, typeh = M.empty, 
        largh = M.empty, rargh = M.empty, boph = M.empty,tlisth = M.empty, 
        quals = M.empty, composedh = M.empty, mkassigns = M.empty, rassigns = M.empty,
-       -- 
+       bexprh = M.empty, constsh = M.empty, emptyh = M.empty
+       {-- 
        denialsh = M.empty, factsh = M.empty, showsh = M.empty, gshowsh = M.empty,
        hidesh = M.empty, ghidesh = M.empty, externalsh = M.empty, functionsh = M.empty, 
        minimizesh = M.empty, maximizesh = M.empty, constsh = M.empty, computesh = M.empty, 
@@ -533,6 +543,7 @@ dereify'' rb =
        weighedh = M.empty, bexprh = M.empty, assignh = M.empty, assignmenth = M.empty, 
        arityh = M.empty, emptyh = M.empty, numberh = M.empty, symh = M.empty, 
        alternativeh = M.empty, arithh = M.empty, funch = M.empty, atomh = M.empty, consth = M.empty
+       --}
     } in 
    case rb of 
         Left l -> hs
@@ -542,8 +553,8 @@ dereify'' rb =
 
 -- dereify (Right [Fact [Plain (Const "hasrule") [Number (Const "1"),Number (Const "2")] True],Fact [Plain (Const "rule") [Number (Const "2")] True],Fact [Plain (Const "pos") [Number (Const "3")] True],Fact [Plain (Const "head") [Number (Const "2"),Number (Const "3")] True],Fact [Plain (Const "neg") [Number (Const "6")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "6")] True],Fact [Plain (Const "pos") [Number (Const "9")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "9")] True]])
 -- dereify (Right [Fact [Plain (Const "hasrule") [Number (Const "1"),Number (Const "2")] True],Fact [Plain (Const "rule") [Number (Const "2")] True],Fact [Plain (Const "pos") [Number (Const "3")] True],Fact [Plain (Const "head") [Number (Const "2"),Number (Const "3")] True],Fact [Plain (Const "pred") [Number (Const "3"),Sym (Const "\"oncycle\"")] True],Fact [Plain (Const "var") [Number (Const "4"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "3"),Number (Const "1"),Number (Const "4")] True],Fact [Plain (Const "var") [Number (Const "5"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "alist") [Number (Const "3"),Number (Const "2"),Number (Const "5")] True],Fact [Plain (Const "neg") [Number (Const "6")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "6")] True],Fact [Plain (Const "pred") [Number (Const "6"),Sym (Const "\"other\"")] True],Fact [Plain (Const "var") [Number (Const "7"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "6"),Number (Const "1"),Number (Const "7")] True],Fact [Plain (Const "var") [Number (Const "8"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "alist") [Number (Const "6"),Number (Const "2"),Number (Const "8")] True],Fact [Plain (Const "pos") [Number (Const "9")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "9")] True],Fact [Plain (Const "pred") [Number (Const "9"),Sym (Const "\"edge\"")] True],Fact [Plain (Const "var") [Number (Const "10"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "9"),Number (Const "1"),Number (Const "10")] True],Fact [Plain (Const "var") [Number (Const "11"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "alist") [Number (Const "9"),Number (Const "2"),Number (Const "11")] True]])
-dereify :: Either ParseError [Rules] -> String 
-dereify x = 
-    let (y,hs) = dereify' x in 
+dereify :: Bool -> Either ParseError [Rules] -> String 
+dereify ground x = 
+    let (y,hs) = dereify' x ground in 
     txtrender ((Right (L.reverse y))::(Either ParseError [Rules]))
 

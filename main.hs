@@ -125,9 +125,9 @@ reify fn1 fn2 params =
     do 
       parsenrendernwrite fn1 fn2 (factrender ("% Inputfile: " ++ fn1 ++ "\n") params)
 
-undoreify fn1 fn2 =
+undoreify fn1 fn2 ground =
     do 
-      parsenrendernwrite fn1 fn2 dereify
+      parsenrendernwrite fn1 fn2 (dereify ground)
 
 data Flag
     = Lparse                -- -l (default)
@@ -135,6 +135,7 @@ data Flag
     | Test                  -- -t
     | Idreuse               -- -i
     | Dereify               -- -d 
+    | Ground                -- -g
     | Help                  -- --help
     deriving (Eq,Ord,Enum,Show,Bounded)
 
@@ -149,6 +150,8 @@ flags =
         "Assigns the same identifier for same variable in one rule."
    ,Option ['d'] []       (NoArg Dereify)
         "Reads in a reified set of facts and constructs reconstructs nonreified ruleset."
+   ,Option ['g'] []       (NoArg Ground)
+        "Reads in a reified set of facts along with variable assignments and performs related grounding."
    ,Option []    ["help"] (NoArg Help)
         "Print this help message"
    ]
@@ -164,11 +167,12 @@ parseopts argv =
    (_,_,errs)      -> do
         System.IO.hPutStrLn stderr (List.concat errs ++ usageInfo header flags)
         exitWith (ExitFailure 1)
-   where header = "Usage: aspparse [-l|r|t|d] [file ...]"
+   where header = "Usage: aspparse [-l|r|t|d|g] [file ...]"
          set Lparse      = [Lparse] 
          set Rdf      = [Rdf] 
          set Test      = [Test] 
          set Dereify      = [Dereify] 
+         set Ground      = [Ground] 
          set f      = [f] 
 
 handleafile otype other f = 
@@ -184,7 +188,10 @@ handleafile otype other f =
        backtolp f loopbackfile
  [Dereify] -> do 
       let dereifiedfile = (f ++ ".dereified") 
-      undoreify f dereifiedfile
+      undoreify f dereifiedfile False
+ [Ground] -> do 
+      let dereifiedfile = (f ++ ".ground") 
+      undoreify f dereifiedfile True
       
  _ -> do -- default is [Lparse]
       let reifiedfile = (f ++ ".reified") 
@@ -200,6 +207,7 @@ separateargs args =
                     | x == Lparse = True 
                     | x == Test = True
                     | x == Dereify = True
+                    | x == Ground = True
                     | otherwise = False  
 
 main = 
@@ -214,4 +222,4 @@ main =
       else do mapM_ (handleafile outputtype other) files 
               exitWith ExitSuccess
 
-      where header = "Usage: aspparse [-l|r|t|d] [file ...]"
+      where header = "Usage: aspparse [-l|r|t|d|g] [file ...]"
