@@ -70,21 +70,18 @@ vargn(P,A,N,S,V) :- varg(A,N,V,S), pred(A,P).
 %       N - is the position of this value in P
 %       X - is the value for this position 
 % And make it only for the ruel that has chosen to be ground 
-% mkassign(R,A,P,N,X) :- rulevar(R,A,V,P,N), cargn(P,C,N,X), ground(R).
-mkassign(R,A,P,N,X) :- rulevar(R,A,V,P,N), cargn(P,C,N,X).
+% mkassign1(R,A,P,N,X) :- rulevar(R,A,V,P,N), cargn(P,C,N,X), ground(R).
+mkassign1(R,A,P,N,X) :- rulevar(R,A,V,P,N), cargn(P,C,N,X).
 
 
 % Problem: we get more than one solution per variable as
 % there are more rulevars as there are actual variables. 
 % Project mkassign, but selvar will never be derived?
-mkassign2(R,A,X) :- mkassign(R,A,P,N,X). %, selvar(A).
-
-% This is not strictly necessary 
-% mkassign3(R,A) :- mkassign2(R,A,X). 
+mkassign2(R,A,X) :- mkassign1(R,A,P,N,X). %, selvar(A).
 
 % There can only be one assignment per variable.
 % Note that "assign" is a reserved word in lparse!
-1 {realassign(R,A,C) : mkassign2(R,A,C) } 1 :- % mkassign3(R,A). % 
+1 {mkassign(R,A,C) : mkassign2(R,A,C) } 1 :- 
   rulevar(R,A,V,P,N), ground(R).
 
 
