@@ -242,7 +242,7 @@ factbody rel parentid ctr r accu =
                         in 
                    accu ++ -- ["YYYTyped\n"] ++ 
                    [myrel ++ "(" ++ show(parentid) ++ "," ++ show(factid) ++ ").\n" ++
-                     -- "qual(" ++ show(factid) ++ ").\n", -- Z1
+                     "composite(" ++ show(factid) ++ ").\n", -- Z1
                      -- show(factid) ++ ",rdf:type,http://m3.org/rls#qual\n" ++
                      (List.foldr (++) ""
                       (typeargs factid ctr b))
