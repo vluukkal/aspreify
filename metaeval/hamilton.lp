@@ -19,14 +19,6 @@ reached(Y) :- reached(X), oncycle(X,Y), edge(X,Y).
 :- not oncycle(Y,X) : edge(Y,X), node(X).
 :- node(X), not reached(X).
 
-% A graph with loops in two directions 
-edge(1,2).
-edge(2,3).
-edge(3,1).
-edge(1,3).
-edge(3,2).
-edge(2,1).
-
 #hide.
 #show oncycle(X,Y).
 

@@ -6,7 +6,8 @@ The purpose of this program is to parse textual answer set programs
 (http://www.tcs.hut.fi/Software/smodels/) and produce a description of
 the input program as ASP facts, effectively reifying the input program
 allowing, among other things, ASP programs to be interpreted or
-modified by other ASP programs.
+modified by other ASP programs. The reified format can be converted back 
+to plain rules.
 
 Vesa Luukkala (vesa.luukkala@gmail.com), 29.11.2012 
 
@@ -22,18 +23,30 @@ Obtain the sources initially:
 Update later on after initially fetching them: 
 > git remote update
 
-A simple test:
+Some simple tests:
 > ./aspreify tests/hamiltonian_cycle.lp
 produces tests/hamiltonian_cycle.lp.reified 
 
 > ./aspreify -t tests/hamiltonian_cycle.lp
 The result has the same unreified rules as the input, used for testing.
+Produced to 
 tests/hamiltonian_cycle.lp.lp
 
 > ./aspreify -r tests/hamiltonian_cycle.lp
-The result is and RDF/N3-like format. 
+The reified result is RDF/N3-like format produced to 
 tests/hamiltonian_cycle.lp.ssls
- 
+
+> ./aspreify -d tests/hamiltonian_cycle.lp.reified 
+The result is corresponding set of dereified rules produced to 
+tests/hamiltonian_cycle.lp.reified.dereified  
+
+> ./aspreify -g tests/hamiltonian_cycle.lp.reified 
+The result is corresponding set of dereified and ground rules 
+produced to 
+tests/hamiltonian_cycle.lp.reified.ground
+The actual grounding must have been done beforehand; the input 
+file must contain facts which describe the grounding. 
+
 2. Limitations 
 
 2.1 Error handling 
@@ -42,7 +55,7 @@ Error handling is rudimentary, syntax errors are reported, but often
 indicated to be after the actual error. Errors are not signaled with the
 return values, but the result file contains the syntax error.
 
-2.2 Non-supported syntax 
+2.2 Issues in input syntax
 
 All of the examples in lparse distribution examples/ directory are parsed. 
 
@@ -57,6 +70,14 @@ ones, e.g. #mod -> mod.
 
 At times the parser may be more liberal than the lparse one,
 e.g. minimize { a(X), b(Y) } will be accepted. 
+
+The dereifier and grounder do not yet support the following syntactical 
+constructs:
+- weighted statments
+- choice staments
+- full expressions 
+- maximize, minimize, compute, function, external, show, hide 
+- #show, #hide
 
 3. Self tests 
 
@@ -79,25 +100,49 @@ and metaeval/meta.lp contains a metaevaluator for variable-free answer set progr
 2. Combine the metaevaluator with the reified program: 
    cat metaeval/meta.lp metaeval/simple_variable_free.lp.reified > metaeval/x.lp
 3. Calculate the answer sets: gringo metaeval/x.lp | clasp -n 0 
-   Compare this with direct evaluation: lparse metaeval/simple_variable_free.lp | smodels 0
-   Or with gringo metaeval/x.lp | clasp -n 0 
+   Compare this with direct evaluation: 
+   lparse metaeval/simple_variable_free.lp | smodels 0
+   Or with 
+   gringo metaeval/x.lp | clasp -n 0 
 
 4.2 Metagrounding 
 
-metaeval/hamilton.lp contains an answer set program with variables and metaeval/metaground.lp 
-contains a metagrounder. 
+metaeval/hamilton.lp contains an answer set program with variables 
+and metaeval/metaground.lp contains a metagrounder implementation. 
 
-1. Reify the program: ./aspreify metaeval/hamilton.lp
-   to produce metaeval/hamilton.lp.reified 
+0. Combine the rules with data: 
+   cat metaeval/hamilton_data1.lp metaeval/hamilton.lp > a.lp
+   (note, that we could also use just the rules in hamilton.lp, but 
+   grounding would not produce any results).
+1. Reify the program: ./aspreify a.lp
+   to produce a.lp.reified 
 2. Combine the metagrounder with the reified program: 
-   cat metaeval/metaground.lp metaeval/hamilton.lp.reified > metaeval/y.lp
-3. Calculate the answer sets: gringo metaeval/y.lp | clasp -n 0 
-   with 63 answer sets, realassign/3 contains the variable assignments. 
+   cat metaeval/metaground.lp a.lp.reified > b.lp
+3. Calculate the variable assignments: gringo b.lp | clasp -n 0 
+   with 63 answer sets, mkassign/3 contains the variable assignments.
+   Each answer set pertains to variable assignment to a single rule. 
+4. Produce the ground program, postprocess the answer sets
+   gringo b.lp | clasp -n 0 | python smodelsres.py 
+   will produce the answer sets to separate files named smres1.lp, 
+   smres2.lp, ..., smres63.lp
+   Each answer set pertains to a particular variable assignment for 
+   a particular rule and nothing else. 
+5. Produce ground rules: ./aspreify -g smres*.lp will produce files 
+   smres1.lp.ground, smres2.lp.ground,... which can then be catenated
+   to one file which corresponds to the ground program and can be handled 
+   by clasp, smodels or similar. 
+   cat *.lp.ground > res.lp
+
 
 5. Other
 
+smodelsres.py program reads in the resulting answer set and converts
+them to facts ands saves individual files with filenames corresponding
+to the number of the answer set. 
+
 The toviz.py program reads in the reified program and generates a
 graphviz graph out of it. 
+
 
 6. TODO
 
