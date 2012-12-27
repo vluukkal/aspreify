@@ -280,6 +280,9 @@ getrulevars h k =
         Just r -> if (doground h) then  (h { rassigns = r }) else h
         Nothing -> h 
 
+{--
+ -- Old one which does not produce facts 
+ -- for assertions, i.e. rules without variables
 citem :: IntermediateR -> String -> [Rules] -> [Rules]
 citem hash key accu = 
    let hash' = getrulevars hash key in 
@@ -297,6 +300,29 @@ citem hash key accu =
         Just x -> (Deny [Plain (Const ("Error at citem: unknown item: "++ x )) [] True]):accu 
         Nothing -> -- accu 
                 (Deny [Plain (Const ("Error at citem: unknown ID: "++key )) [] True]):accu 
+--}
+
+citem :: IntermediateR -> String -> [Rules] -> [Rules]
+citem hash key accu = 
+   let hash' = getrulevars hash key in 
+   -- Ugh, cake on cake here
+   -- let hash' = if (doground hash') then hash' else (hash' { rassigns = M.empty }) in 
+   let tp = M.lookup key (typeh hash') in 
+   case tp of 
+      Just "rule" -> checkground hash' (crule hash' key accu) accu 
+      Just "constraint" -> checkground hash' (cconstraint hash' key accu) accu 
+      Just "assert" -> cassert hash' key accu 
+      -- Just "composite" -> cassert hash key accu 
+      Just x -> (Deny [Plain (Const ("Error at citem: unknown item: "++ x )) [] True]):accu 
+      Nothing -> -- accu 
+              (Deny [Plain (Const ("Error at citem: unknown ID: "++key )) [] True]):accu 
+   where 
+      checkground h func accu = 
+        if (M.null (rassigns h)) && (doground h) 
+        then accu 
+        else func
+                   
+
 
 crule :: IntermediateR -> String -> [Rules] -> [Rules]
 crule hash key accu = 
