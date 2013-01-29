@@ -10,7 +10,7 @@
 -- Prelude> parse atom "" "\"wp1:Person\""
 -- Right (Const "\"wp1:Person\"")
 -- 
--- Copyright 2012 Vesa Luukkala
+-- Copyright 2012,2013 Vesa Luukkala
 -- 
 -- Permission is hereby granted, free of charge, to any person obtaining
 -- a copy of this software and associated documentation files (the
@@ -250,6 +250,7 @@ data Body = Plain Atom [MyExpr] Bool
           | Assign Atom MyExpr
           | Assignment Atom Body Bool -- urgh, we have to separate between 
           | Arity Atom String
+          | Comment String 
           | Empty 
             deriving (Show,Eq)
 
@@ -266,6 +267,8 @@ data Rules = Rule Body [Body]
            | Maximize [Body]
            | Consts [Body]
            | Computes Atom [Body]
+           | RComment String    -- How to render this better?
+           | Emptyset
             deriving (Show,Eq)
 
 -- parse arel "" "arc(X, Y, L) = L"
@@ -1299,6 +1302,9 @@ threerule = do {
 
 -- parse rulebase "" "hasrule(1,2).rule(2).pos(3).head(2,3).pred(3,\"other\").var(4,\"X\").alist(3,1,4).var(5,\"Y\").alist(3,2,5).bexpr(2,6).bop(6,\"!=\").larg(6,7).var(7,\"Y\").rarg(6,8).var(8,\"Z\").pos(9).body(2,9).pred(9,\"edge\").var(10,\"X\").alist(9,1,10).var(11,\"Y\").alist(9,2,11)." 
 -- Right [Fact [Plain (Const "hasrule") [Number (Const "1"),Number (Const "2")] True],Fact [Plain (Const "rule") [Number (Const "2")] True],Fact [Plain (Const "pos") [Number (Const "3")] True],Fact [Plain (Const "head") [Number (Const "2"),Number (Const "3")] True],Fact [Plain (Const "pred") [Number (Const "3"),Sym (Const "\"other\"")] True],Fact [Plain (Const "var") [Number (Const "4"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "3"),Number (Const "1"),Number (Const "4")] True],Fact [Plain (Const "var") [Number (Const "5"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "alist") [Number (Const "3"),Number (Const "2"),Number (Const "5")] True],Fact [Plain (Const "bexpr") [Number (Const "2"),Number (Const "6")] True],Fact [Plain (Const "bop") [Number (Const "6"),Sym (Const "\"!=\"")] True],Fact [Plain (Const "larg") [Number (Const "6"),Number (Const "7")] True],Fact [Plain (Const "var") [Number (Const "7"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "rarg") [Number (Const "6"),Number (Const "8")] True],Fact [Plain (Const "var") [Number (Const "8"),Sym (Const "\"Z\"")] True],Fact [Plain (Const "pos") [Number (Const "9")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "9")] True],Fact [Plain (Const "pred") [Number (Const "9"),Sym (Const "\"edge\"")] True],Fact [Plain (Const "var") [Number (Const "10"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "9"),Number (Const "1"),Number (Const "10")] True],Fact [Plain (Const "var") [Number (Const "11"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "alist") [Number (Const "9"),Number (Const "2"),Number (Const "11")] True]]
+
+-- parse rulebase "" "hasrule(1,2).constraint(2).pos(3).body(2,3).pred(3,\"node\").var(4,\"X\").alist(3,1,4).body(2,5).composite(5).tlist(5,1,6).neg(7).qual(6,7).pred(7,\"oncycle\").var(8,\"Y\").alist(7,1,8).var(9,\"X\").alist(7,2,9).tlist(5,2,10).pos(11).qual(10,11).pred(11,\"edge\").var(12,\"Y\").alist(11,1,12).var(13,\"X\").alist(11,2,13)." 
+-- Right [Fact [Plain (Const "hasrule") [Number (Const "1"),Number (Const "2")] True],Fact [Plain (Const "constraint") [Number (Const "2")] True],Fact [Plain (Const "pos") [Number (Const "3")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "3")] True],Fact [Plain (Const "pred") [Number (Const "3"),Sym (Const "\"node\"")] True],Fact [Plain (Const "var") [Number (Const "4"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "3"),Number (Const "1"),Number (Const "4")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "5")] True],Fact [Plain (Const "composite") [Number (Const "5")] True],Fact [Plain (Const "tlist") [Number (Const "5"),Number (Const "1"),Number (Const "6")] True],Fact [Plain (Const "neg") [Number (Const "7")] True],Fact [Plain (Const "qual") [Number (Const "6"),Number (Const "7")] True],Fact [Plain (Const "pred") [Number (Const "7"),Sym (Const "\"oncycle\"")] True],Fact [Plain (Const "var") [Number (Const "8"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "alist") [Number (Const "7"),Number (Const "1"),Number (Const "8")] True],Fact [Plain (Const "var") [Number (Const "9"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "7"),Number (Const "2"),Number (Const "9")] True],Fact [Plain (Const "tlist") [Number (Const "5"),Number (Const "2"),Number (Const "10")] True],Fact [Plain (Const "pos") [Number (Const "11")] True],Fact [Plain (Const "qual") [Number (Const "10"),Number (Const "11")] True],Fact [Plain (Const "pred") [Number (Const "11"),Sym (Const "\"edge\"")] True],Fact [Plain (Const "var") [Number (Const "12"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "alist") [Number (Const "11"),Number (Const "1"),Number (Const "12")] True],Fact [Plain (Const "var") [Number (Const "13"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "11"),Number (Const "2"),Number (Const "13")] True]]
 
 -- rule = header >> string ":-" >> body
 
