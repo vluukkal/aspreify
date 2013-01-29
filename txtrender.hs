@@ -1,7 +1,7 @@
 --
 -- Renderer which renders the pasre tree without reification. 
 -- 
--- Copyright 2012 Vesa Luukkala
+-- Copyright 2012,2013 Vesa Luukkala
 -- 
 -- Permission is hereby granted, free of charge, to any person obtaining
 -- a copy of this software and associated documentation files (the
@@ -111,14 +111,15 @@ txtbody' r accu =
     Assignment nm e nonneg -> accu ++ [(if nonneg then "" else "not ") ++ (unatom nm) ++ " = " ++ L.head (txtbody' e [])]
     -- Empty -> accu ++ [" NONE "]
     Empty -> accu ++ [""]
+    Comment s -> accu ++ [("% " ++ s)]
     -- Empty -> accu ++ []
     Arity a n -> accu ++ [(unatom a) ++ "/" ++ n]
 
 txtitem i accu =
     case i of
-      Rule b l -> accu ++ L.head(txtbody' b []) ++ " :- \n\t " ++ 
+      Rule b l -> accu ++ L.head(txtbody' b []) ++ (if (L.null l) then ".\n\n" else " :- \n\t " ++ 
                   L.unwords(L.intersperse ",\n\t" (L.foldr txtbody' [] (L.reverse l))) ++ 
-                 ".\n\n"
+                 ".\n\n")
       Deny l -> accu  ++ ":- \n\t " ++ 
                 L.unwords(L.intersperse ",\n\t" (L.foldr txtbody' [] (L.reverse l))) ++ ".\n\n"
       Fact l -> accu  ++ 
@@ -153,7 +154,8 @@ txtitem i accu =
       Computes n l -> accu ++ L.unwords(L.intersperse ",\n" 
                                 (L.foldr (\x a -> ("compute " ++ unatom(n) ++ " " ++ x):a) [] 
                                  (L.foldr txtbody' [] (L.reverse l)))) ++ ".\n\n"
-
+      RComment s -> accu ++ ("% " ++ s ++ "\n")
+      Emptyset -> accu 
 
 txtrender rb = 
     case rb of 
