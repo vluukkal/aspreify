@@ -4,6 +4,13 @@
 % Two answer sets:
 % {oncycle(2,1) oncycle(3,2) oncycle(1,3)}
 % {oncycle(3,1) oncycle(2,3) oncycle(1,2)}
+% for:
+% edge(1,2).
+% edge(2,3).
+% edge(3,1).
+% edge(1,3).
+% edge(3,2).
+% edge(2,1).
 % 
 
 oncycle(X,Y) :- edge(X,Y), not other(X,Y).
