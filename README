@@ -111,28 +111,27 @@ metaeval/hamilton.lp contains an answer set program with variables
 and metaeval/metaground.lp contains a metagrounder implementation. 
 
 0. Combine the rules with data: 
-   cat metaeval/hamilton_data1.lp metaeval/hamilton.lp > a.lp
+   cat metaeval/hamilton_data1.lp metaeval/hamilton.lp > metaeval/a.lp
    (note, that we could also use just the rules in hamilton.lp, but 
    grounding would not produce any results).
-1. Reify the program: ./aspreify a.lp
-   to produce a.lp.reified 
+1. Reify the program: ./aspreify metaeval/a.lp
+   to produce metaeval/a.lp.reified 
 2. Combine the metagrounder with the reified program: 
-   cat metaeval/metaground.lp a.lp.reified > b.lp
-3. Calculate the variable assignments: gringo b.lp | clasp -n 0 
+   cat metaeval/metaground.lp metaeval/a.lp.reified > metaeval/b.lp
+3. Calculate the variable assignments: gringo metaeval/b.lp | clasp -n 0 
    with 63 answer sets, mkassign/3 contains the variable assignments.
    Each answer set pertains to variable assignment to a single rule. 
 4. Produce the ground program, postprocess the answer sets
-   gringo b.lp | clasp -n 0 | python smodelsres.py 
+   gringo metaeval/b.lp | clasp -n 0 | python smodelsres.py 
    will produce the answer sets to separate files named smres1.lp, 
    smres2.lp, ..., smres63.lp
    Each answer set pertains to a particular variable assignment for 
    a particular rule and nothing else. 
-5. Produce ground rules: ./aspreify -g smres*.lp will produce files 
+5. Produce ground rules: ./aspreify -g metaeval/smres*.lp will produce files 
    smres1.lp.ground, smres2.lp.ground,... which can then be catenated
    to one file which corresponds to the ground program and can be handled 
    by clasp, smodels or similar. 
    cat *.lp.ground > res.lp
-
 
 5. Other
 
