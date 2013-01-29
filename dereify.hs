@@ -1,7 +1,7 @@
 --
 -- A backend which dereifies a parsed set of facts
 --
--- Copyright 2012 Vesa Luukkala
+-- Copyright 2012,2013 Vesa Luukkala
 -- 
 -- Permission is hereby granted, free of charge, to any person obtaining
 -- a copy of this software and associated documentation files (the
@@ -68,44 +68,27 @@ data IntermediateR = IntermediateR {
      rargh      :: (M.Map String String),
      mkassigns  :: (M.Map String (M.Map String String)),
      rassigns  ::  (M.Map String String),
+     ptrue     :: (M.Map String String),
+     pfalse     :: (M.Map String String),
+     -- xpand     :: (M.Map (String,String) (M.Map String String)),
+     -- xpand     :: (M.Map String [(M.Map String String)]),
+     xpand     :: (M.Map String (M.Map String (M.Map String String))),
      -- 
      bexprh      :: (M.Map String [String]), 
      constsh     :: (M.Map String [String]),
      emptyh      :: (M.Map String [String])
-
-     {-- 
-     denialsh    :: (M.Map String [String]),
-     factsh      :: (M.Map String [String]),
-     showsh      :: (M.Map String [String]),
-     gshowsh     :: (M.Map String [String]),
-     hidesh     :: (M.Map String [String]),
-     ghidesh    :: (M.Map String [String]),
-     externalsh  :: (M.Map String [String]),
-     functionsh :: (M.Map String [String]),
-     minimizesh  :: (M.Map String [String]),
-     maximizesh  :: (M.Map String [String]),
-     computesh   :: (M.Map String [String]), 
-     -- The hashes for Body
-     plainh      :: (M.Map String [String]), 
-     cardh      :: (M.Map String [String]), 
-     counth      :: (M.Map String [String]), 
-     optimizeh      :: (M.Map String [String]), 
-     typedh      :: (M.Map String [String]), 
-     weighedh      :: (M.Map String [String]), 
-     assignh      :: (M.Map String [String]), 
-     assignmenth      :: (M.Map String [String]), 
-     arityh      :: (M.Map String [String]), 
-     -- MyExpr stuff 
-     numberh :: (M.Map String [String]), 
-     symh :: (M.Map String [String]), 
-     alternativeh :: (M.Map String [String]), 
-     arithh :: (M.Map String [String]), 
-     funch :: (M.Map String [String]), 
-     -- Operations are not recorded
-     atomh :: (M.Map String [String]), 
-     consth :: (M.Map String [String])
-     --}
 } deriving (Show)
+
+emptyIntermediate x = 
+  IntermediateR {
+       doground = x, 
+       rulesh = M.empty, hasrulesh = M.empty, 
+       headsh = M.empty, bodysh = M.empty, posh = M.empty, negh = M.empty,
+       predsh = M.empty, varsh = M.empty, alisth = M.empty, typeh = M.empty, 
+       largh = M.empty, rargh = M.empty, boph = M.empty,tlisth = M.empty, 
+       quals = M.empty, composedh = M.empty, mkassigns = M.empty, rassigns = M.empty, 
+       ptrue = M.empty, pfalse = M.empty, xpand = M.empty, 
+       bexprh = M.empty, constsh = M.empty, emptyh = M.empty}
 
 collectb :: t -> t1 -> Body
 collectb rls bdy = Empty 
@@ -119,7 +102,7 @@ getarg a n =
        Sym (Const s) -> s
        Number (Const s) -> s
 
--- Here we dispathc based on the name of the reified predicate 
+-- Here we dispatch based on the name of the reified predicate 
 -- The types of the hashes could be changed, but would it just make life
 -- harder. 
 assigntohash :: IntermediateR -> [Char] -> [MyExpr] -> t -> IntermediateR
@@ -187,6 +170,14 @@ assigntohash hs nm bdy neg =
                 let tmphs = negh hs in 
                 let newhs = M.insert src [""] tmphs in
                        hs { negh = newhs }
+      "ptrue" ->  let src = getarg bdy 0 in 
+                let tmphs = ptrue hs in 
+                let newhs = M.insert src "" tmphs in
+                       hs { ptrue = newhs }
+      "pfalse" ->  let src = getarg bdy 0 in 
+                let tmphs = pfalse hs in 
+                let newhs = M.insert src "" tmphs in
+                       hs { pfalse = newhs }
       "pred" -> let src = getarg bdy 0 in 
                 let trgt = getarg bdy 1 in 
                 let hs' = addtype bdy nm 0 in 
@@ -221,6 +212,77 @@ assigntohash hs nm bdy neg =
                   where 
                       updvr :: Ord k => M.Map k a -> M.Map k a -> M.Map k a
                       updvr newh oldh = M.union oldh newh
+{--
+      "xpand" ->  let rn = getarg bdy 0 in 
+                  let prdid = getarg bdy 1 in 
+                  let jstid = getarg bdy 2 in 
+                  let tlistid = getarg bdy 3 in 
+                  let tmphs = xpand hs in 
+                  let tmpins = M.insert prdid jstid M.empty in 
+                  let newhs = M.insertWith updvr tlistid tmpins tmphs in 
+                       hs { xpand = newhs }
+                  where 
+                      updvr :: Ord k => M.Map k a -> M.Map k a -> M.Map k a
+                      updvr newh oldh = M.union oldh newh
+--}
+      -- boundexpandvv(78,"edge","Y","2",86,81,23).
+      -- later on we get tlistid and we want to get 
+      -- all the same justifications.
+      -- When travalling tlist later we may get 2, 86, 82 (index 2)
+      -- typeh[81] = "composite"
+      -- xpand[81] = [[23] = ["X"] = "2" 
+      --                  = ["Y"] = "1"]
+      -- Well keep a list of hashes, but do we need the middle key [23]?
+      "boundexpandvv" ->  let rn = getarg bdy 0 in -- we dont want this
+                  let prdnm = getarg bdy 1 in      -- we dont want this 
+                  let vname = getarg bdy 2 in 
+                  let vval = getarg bdy 3 in 
+                  let predref = getarg bdy 4 in 
+                  let tlistid = getarg bdy 5 in 
+                  let justid = getarg bdy 6 in     -- this is to bind potential other 
+                                                   -- values from same justification here. 
+                                                   -- later we should be able to obtain all of the 
+                                                   -- values of the same justification 
+                  let newhs = puttohsh tlistid justid vname vval (xpand hs) in 
+                  -- Since we are adding stuff to newhs, we need to mark 
+                  -- the rule in rassigns as later on we need to have some 
+                  -- content in rasssigns in order to proceed with grounding. 
+                  let newrassigns = M.union (rassigns hs) (M.insert prdnm "bogusmarker" M.empty) in 
+                       hs { xpand = newhs, rassigns = newrassigns }
+                  where 
+                    puttohsh k1 k2 k3 v hsh = 
+                      let one = M.lookup k1 hsh in 
+                      case one of 
+                        Just two' -> 
+                             let two = M.lookup k2 two' in 
+                             case two of 
+                               Just three -> 
+                                    let newhsh3 = M.insert k3 v three in 
+                                    let newhsh2 = M.insert k2 newhsh3 two' in 
+                                      M.insert k1 newhsh2 hsh
+                               Nothing -> M.insert k1 (M.insert k2 (M.insert k3 v M.empty) two') hsh 
+                        Nothing -> M.insert k1 (M.insert k2 (M.insert k3 v M.empty) M.empty) hsh 
+                  
+{--
+      "boundexpandvv" ->  let rn = getarg bdy 0 in -- we dont want this
+                  let prdnm = getarg bdy 1 in      -- we dont want this 
+                  let vname = getarg bdy 2 in 
+                  let vval = getarg bdy 3 in 
+                  let predref = getarg bdy 4 in 
+                  let tlistid = getarg bdy 5 in 
+                  let justid = getarg bdy 6 in     -- this is to bind potential other 
+                                                   -- values from same justification here. 
+                                                   -- later we should be able to obtain all of the 
+                                                   -- values of the same justification 
+                  let tmphs = xpand hs in 
+                  let tmpins = M.insert vname vval M.empty in 
+                  -- let newhs = M.insertWith updvr (tlistid,justid) tmpins tmphs in 
+                  let newhs = M.insertWith updvr (tlistid,justid) tmpins tmphs in 
+                       hs { xpand = newhs }
+                  where 
+                      updvr :: Ord k => M.Map k a -> M.Map k a -> M.Map k a
+                      updvr newh oldh = M.union oldh newh
+--}
       "tlist" ->  let src = getarg bdy 0 in 
                   let idx = getarg bdy 1 in 
                   let trgt = getarg bdy 2 in 
@@ -258,21 +320,22 @@ collect i intermediate =
               x
          _ -> intermediate
 
+-- This is the actual dereification function. 
 -- Above this the functions pertain to collecting stuff 
 -- from the individual facts; here we go through them 
 -- again and form a 'Rules' syntax tree which can be 
 -- rendered back. 
-pull i = 
+pull i handleall = 
   -- if M.member i (typeh i)
   let rls = hasrulesh i in 
   -- let y = M.foldWithKey (citem i) [] rls in 
-  let y = M.foldWithKey (crulebase i) [] rls in 
+  let y = M.foldWithKey (crulebase handleall i) [] rls in 
        -- y <- M.foldWithKey (crule i) (Just []) rls 
        y
        -- (Fact y)
 
-crulebase hash key v accu = 
-    L.foldr (citem hash) [] v 
+crulebase handleall hash key v accu = 
+    L.foldr (citem handleall hash) [] v 
 
 getrulevars h k = 
    let vars = M.lookup k (mkassigns h) in 
@@ -302,16 +365,17 @@ citem hash key accu =
                 (Deny [Plain (Const ("Error at citem: unknown ID: "++key )) [] True]):accu 
 --}
 
-citem :: IntermediateR -> String -> [Rules] -> [Rules]
-citem hash key accu = 
+citem :: Bool -> IntermediateR -> String -> [Rules] -> [Rules]
+citem handleall hash key accu = 
    let hash' = getrulevars hash key in 
    -- Ugh, cake on cake here
    -- let hash' = if (doground hash') then hash' else (hash' { rassigns = M.empty }) in 
    let tp = M.lookup key (typeh hash') in 
+   let cmnt = (RComment ("Source key: " ++ show(key) )) in
    case tp of 
-      Just "rule" -> checkground hash' (crule hash' key accu) accu 
-      Just "constraint" -> checkground hash' (cconstraint hash' key accu) accu 
-      Just "assert" -> cassert hash' key accu 
+      Just "rule" -> checkground hash' (crule hash' key (cmnt:accu)) accu 
+      Just "constraint" -> checkground hash' (cconstraint hash' key (cmnt:accu)) accu 
+      Just "assert" -> if handleall then (cassert hash' key (cmnt:accu)) else accu 
       -- Just "composite" -> cassert hash key accu 
       Just x -> (Deny [Plain (Const ("Error at citem: unknown item: "++ x )) [] True]):accu 
       Nothing -> -- accu 
@@ -319,9 +383,15 @@ citem hash key accu =
    where 
       checkground h func accu = 
         if (M.null (rassigns h)) && (doground h) 
-        then accu 
-        else func
+        then (RComment ("Not grounding: " ++ show(key) ++ " -- " ++ (show h))):accu 
+        -- else (RComment ("Vars: " ++ (rendervars h))):func
+        else func ++ [(RComment ("Vars: " ++ (rendervars h)))]
                    
+rendervars h = 
+  let boundvars = (rassigns h) in 
+  M.foldrWithKey sval "" boundvars
+  where 
+    sval v k accu = accu ++ ("(" ++ v ++ ": " ++ k ++ ")")
 
 
 crule :: IntermediateR -> String -> [Rules] -> [Rules]
@@ -379,30 +449,115 @@ crule' hash key v accu =
 chead h k = 
       cpred h k 
 
-{--
-cbody h k accu = 
-      (cpred h k):accu
---}
 cbody :: IntermediateR -> String -> [Body] -> [Body]
 cbody hash key accu = 
-   let tp = M.lookup key (typeh hash) in 
-   case tp of 
-        Just "bexpr" -> cbexpr hash key accu 
-        Just "pred" -> (cpred hash key):accu 
-        Just "composite" -> (ctlist hash key):accu -- let nxt = ( hash) M.! key 
-        Nothing -> -- accu 
-                (Plain (Const ("Error at cbody: unknown ID: "++key )) [] True):accu 
+   let unnecessary = M.lookup key (ptrue hash) in 
+   case unnecessary of 
+      Nothing -> actualbody hash key accu 
+      Just a -> 
+           let isnegated = M.lookup key (negh hash) in 
+           case isnegated of 
+             Nothing -> (Comment ("Dropped " ++ show(key))):accu -- accu 
+             Just a -> actualbody hash key accu 
+    where 
+      actualbody hash key accu = 
+          let tp = M.lookup key (typeh hash) in 
+           case tp of 
+                Just "bexpr" -> cbexpr hash key accu 
+                Just "pred" -> (cpred hash key):accu 
+                Just "composite" -> (ctlist hash key) ++ accu -- let nxt = ( hash) M.! key 
+                Nothing -> -- accu 
+                        (Plain (Const ("Error at cbody: unknown ID: "++key )) [] True):accu        
 
-ctlist :: IntermediateR -> String -> Body
-ctlist h k = 
+ -- The original, non grounding one 
+-- ctlist :: IntermediateR -> String -> Body
+ctlist' :: IntermediateR -> String -> [Body]
+ctlist' h k = 
     let args = (tlisth h) M.! k in 
     let args' = L.foldr (targl h) [] args in -- [(idx,id)] to [(idx,Body)]
     let oargs = L.sortBy myc args' in -- order by index 
     let (_,oargs') = L.unzip oargs in -- We need to translate [(idx,Body)] to [Body]
-      (Typed oargs')
+      -- (Typed oargs')
+      [(Typed oargs')]
     where 
       myc (i1,v1) (i2,v2) = i1 `compare` i2
 
+{--  
+Here we need to generate new instances of the zeroeth 
+entry and follow xpands to get the values for the 
+variables. 
+We need to rewrite this to a set of plain facts with the
+variables coming from the boundexpandvv, maybe.  
+--}
+{-- --}
+ctlist :: IntermediateR -> String -> [Body]
+ctlist h k = 
+    let args = (tlisth h) M.! k in 
+    let oargs = L.sortBy myc args in -- order by index, [(idx,id)]
+    -- now get the first entry, which is the template to be filled in 
+    -- by the following grounding phase 
+    let tmplt = oargs L.!! 0 in
+    -- The rest of them contain the templates by which the template
+    -- needs to be instantiated.  
+    let rest = L.tail oargs in 
+      (instantiatectlist h k tmplt rest) ++ [(Comment ("ctlist for " ++ show(k) ++ " with initial " ++ show(tmplt)) )]
+    where 
+      myc (i1,v1) (i2,v2) = i1 `compare` i2
+{-- --}
+
+
+-- instantiatectlist :: IntermediateR -> String -> a -> [a] -> Body
+-- We use the tmplt and obtain the different variable bindings 
+-- from xpand. 
+-- tlist(81,2,86).
+-- qual(86,87).
+-- rulepred(86,87).
+--
+-- (idx,id) == (2, 86)
+-- we are not really interested in idx, but the 
+-- values produced by justification for particular variables
+instantiatectlist h k (idx,id) l = 
+-- We need to get the variables and feed them to 
+-- the cbody. k is the tlist ID, which we use to get stuff
+-- from xpand, but we need the justid for the key as well
+-- and that can only come from l.
+-- In the worst case we may need to get the variables from 
+-- another 'scope', that is the binding may come from the 
+-- regular variables... 
+-- We may have to join and overwrite rassigns. 
+  L.foldr cmbn [] l 
+  where
+    cmbn (idx',v) accu = 
+       let assgn = joinalevel k (xpand h) in 
+       -- For each of these assignments we need to create a cbody 
+       -- instantiated with them. We also need to combine them 
+       -- with the rassigns in order to do a proper expansion.
+       let potqualidx = M.lookup id (quals h) in 
+       case potqualidx of 
+            Just qualidx -> 
+                 let qualpredidx = M.lookup v (quals h) in 
+                 case qualpredidx of 
+                      Just vv -> -- let xpanded = L.foldr (\lhsh ac -> (cbody (h { rassigns = M.union lhsh (rassigns h)}) vv ac )) [] assgn in 
+                           let xpanded = L.foldr (\lhsh ac -> (cbody (h { rassigns = M.union lhsh (rassigns h)}) qualidx ac )) [] assgn in 
+                               xpanded++accu 
+                      Nothing -> (Comment ("xpand no qualididx:" ++ show(v)) ):accu 
+            Nothing -> (Comment ("xpand no template qualididx:" ++ show(idx)) ):accu 
+    joinalevel k1 hsh = 
+      -- We have a three level hash, we get the first by 
+      -- key and then get a list of all leave hashes from the bottom level 
+      -- irrespective of their keys. 
+      let one = M.lookup k1 hsh in 
+      case one of 
+        Just two' -> 
+            let res = M.foldr f [] two' in  
+                res
+        Nothing -> []
+      where 
+          f i accu = 
+            let leaves = M.foldrWithKey (\k g ac -> (k,g):ac) [] i in 
+                (M.fromList leaves):accu 
+
+   
 targl h (idx,v) accu = 
     let tmp = (quals h) in 
     let nxt = tmp M.! v in 
@@ -469,6 +624,8 @@ cexpr hash key =
 -- if the rassign hash is nonempty and has
 -- the given variable, we return a Cnst 
 -- instead of var. 
+-- let tst = (emptyIntermediate True) {xpand = fromList [("81",[fromList [("\"X\"","\"2\"")],fromList [("\"Y\"","\"1\"")],fromList [("\"X\"","\"3\"")],fromList [("\"Y\"","\"2\"")],fromList [("\"X\"","\"1\"")],fromList [("\"Y\"","\"3\"")],fromList [("\"X\"","\"3\"")],fromList [("\"Y\"","\"1\"")],fromList [("\"X\"","\"2\"")],fromList [("\"Y\"","\"3\"")],fromList [("\"X\"","\"1\"")],fromList [("\"Y\"","\"2\"")]])]}
+-- let tst' = tst { rassigns = xpand}
 ground hash vname = 
    let boundvars = (rassigns hash) in 
    let val = M.lookup vname boundvars in 
@@ -520,32 +677,23 @@ rmquot s =
 -- dereify' (Right [Fact [Plain (Const "hasrule") [Number (Const "1"),Number (Const "2")] True],Fact [Plain (Const "constraint") [Number (Const "2")] True],Fact [Plain (Const "pos") [Number (Const "3")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "3")] True],Fact [Plain (Const "pred") [Number (Const "3"),Sym (Const "\"node\"")] True],Fact [Plain (Const "var") [Number (Const "4"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "3"),Number (Const "1"),Number (Const "4")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "5")] True],Fact [Plain (Const "composite") [Number (Const "5")] True],Fact [Plain (Const "tlist") [Number (Const "5"),Number (Const "1"),Number (Const "6")] True],Fact [Plain (Const "neg") [Number (Const "7")] True],Fact [Plain (Const "qual") [Number (Const "6"),Number (Const "7")] True],Fact [Plain (Const "pred") [Number (Const "7"),Sym (Const "\"oncycle\"")] True],Fact [Plain (Const "var") [Number (Const "8"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "alist") [Number (Const "7"),Number (Const "1"),Number (Const "8")] True],Fact [Plain (Const "var") [Number (Const "9"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "7"),Number (Const "2"),Number (Const "9")] True],Fact [Plain (Const "tlist") [Number (Const "5"),Number (Const "2"),Number (Const "10")] True],Fact [Plain (Const "pos") [Number (Const "11")] True],Fact [Plain (Const "qual") [Number (Const "10"),Number (Const "11")] True],Fact [Plain (Const "pred") [Number (Const "11"),Sym (Const "\"edge\"")] True],Fact [Plain (Const "var") [Number (Const "12"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "alist") [Number (Const "11"),Number (Const "1"),Number (Const "12")] True],Fact [Plain (Const "var") [Number (Const "13"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "11"),Number (Const "2"),Number (Const "13")] True]])
 -- 
 
+-- parse rulebase "" "xpand(78,87,23,81).xpand(78,87,19,81).xpand(78,87,15,81).xpand(78,87,11,81).xpand(78,87,7,81).xpand(78,87,3,81).boundexpandvv(78,\"edge\",\"Y\",\"2\",81,23).boundexpandvv(78,\"edge\",\"X\",\"1\",81,23).boundexpandvv(78,\"edge\",\"Y\",\"3\",81,19).boundexpandvv(78,\"edge\",\"X\",\"2\",81,19).boundexpandvv(78,\"edge\",\"Y\",\"1\",81,15).boundexpandvv(78,\"edge\",\"X\",\"3\",81,15).boundexpandvv(78,\"edge\",\"Y\",\"3\",81,11).boundexpandvv(78,\"edge\",\"X\",\"1\",81,11).boundexpandvv(78,\"edge\",\"Y\",\"2\",81,7).boundexpandvv(78,\"edge\",\"X\",\"3\",81,7).boundexpandvv(78,\"edge\",\"Y\",\"1\",81,3).boundexpandvv(78,\"edge\",\"X\",\"2\",81,3)."
+
+-- dereify' (Right [Fact [Plain (Const "xpand") [Number (Const "78"),Number (Const "87"),Number (Const "23"),Number (Const "81")] True],Fact [Plain (Const "xpand") [Number (Const "78"),Number (Const "87"),Number (Const "19"),Number (Const "81")] True],Fact [Plain (Const "xpand") [Number (Const "78"),Number (Const "87"),Number (Const "15"),Number (Const "81")] True],Fact [Plain (Const "xpand") [Number (Const "78"),Number (Const "87"),Number (Const "11"),Number (Const "81")] True],Fact [Plain (Const "xpand") [Number (Const "78"),Number (Const "87"),Number (Const "7"),Number (Const "81")] True],Fact [Plain (Const "xpand") [Number (Const "78"),Number (Const "87"),Number (Const "3"),Number (Const "81")] True],Fact [Plain (Const "boundexpandvv") [Number (Const "78"),Sym (Const "\"edge\""),Sym (Const "\"Y\""),Sym (Const "\"2\""),Number (Const "81"),Number (Const "23")] True],Fact [Plain (Const "boundexpandvv") [Number (Const "78"),Sym (Const "\"edge\""),Sym (Const "\"X\""),Sym (Const "\"1\""),Number (Const "81"),Number (Const "23")] True],Fact [Plain (Const "boundexpandvv") [Number (Const "78"),Sym (Const "\"edge\""),Sym (Const "\"Y\""),Sym (Const "\"3\""),Number (Const "81"),Number (Const "19")] True],Fact [Plain (Const "boundexpandvv") [Number (Const "78"),Sym (Const "\"edge\""),Sym (Const "\"X\""),Sym (Const "\"2\""),Number (Const "81"),Number (Const "19")] True],Fact [Plain (Const "boundexpandvv") [Number (Const "78"),Sym (Const "\"edge\""),Sym (Const "\"Y\""),Sym (Const "\"1\""),Number (Const "81"),Number (Const "15")] True],Fact [Plain (Const "boundexpandvv") [Number (Const "78"),Sym (Const "\"edge\""),Sym (Const "\"X\""),Sym (Const "\"3\""),Number (Const "81"),Number (Const "15")] True],Fact [Plain (Const "boundexpandvv") [Number (Const "78"),Sym (Const "\"edge\""),Sym (Const "\"Y\""),Sym (Const "\"3\""),Number (Const "81"),Number (Const "11")] True],Fact [Plain (Const "boundexpandvv") [Number (Const "78"),Sym (Const "\"edge\""),Sym (Const "\"X\""),Sym (Const "\"1\""),Number (Const "81"),Number (Const "11")] True],Fact [Plain (Const "boundexpandvv") [Number (Const "78"),Sym (Const "\"edge\""),Sym (Const "\"Y\""),Sym (Const "\"2\""),Number (Const "81"),Number (Const "7")] True],Fact [Plain (Const "boundexpandvv") [Number (Const "78"),Sym (Const "\"edge\""),Sym (Const "\"X\""),Sym (Const "\"3\""),Number (Const "81"),Number (Const "7")] True],Fact [Plain (Const "boundexpandvv") [Number (Const "78"),Sym (Const "\"edge\""),Sym (Const "\"Y\""),Sym (Const "\"1\""),Number (Const "81"),Number (Const "3")] True],Fact [Plain (Const "boundexpandvv") [Number (Const "78"),Sym (Const "\"edge\""),Sym (Const "\"X\""),Sym (Const "\"2\""),Number (Const "81"),Number (Const "3")] True]])
+
+-- ([],IntermediateR {doground = True, hasrulesh = fromList [], rulesh = fromList [], headsh = fromList [], bodysh = fromList [], posh = fromList [], negh = fromList [], predsh = fromList [], varsh = fromList [], alisth = fromList [], tlisth = fromList [], typeh = fromList [], quals = fromList [], composedh = fromList [], boph = fromList [], largh = fromList [], rargh = fromList [], mkassigns = fromList [], rassigns = fromList [], ptrue = fromList [], pfalse = fromList [], xpand = fromList [(("81","11"),fromList [("\"X\"","\"1\""),("\"Y\"","\"3\"")]),(("81","15"),fromList [("\"X\"","\"3\""),("\"Y\"","\"1\"")]),(("81","19"),fromList [("\"X\"","\"2\""),("\"Y\"","\"3\"")]),(("81","23"),fromList [("\"X\"","\"1\""),("\"Y\"","\"2\"")]),(("81","3"),fromList [("\"X\"","\"2\""),("\"Y\"","\"1\"")]),(("81","7"),fromList [("\"X\"","\"3\""),("\"Y\"","\"2\"")])], bexprh = fromList [], constsh = fromList [], emptyh = fromList [("xpand",[""])]})
+
+-- (IntermediateR {doground = True, hasrulesh = fromList [("1",["78","22","18","14","10","6","2"])], rulesh = fromList [], headsh = fromList [("10",["11"]),("14",["15"]),("18",["19"]),("2",["3"]),("22",["23"]),("6",["7"])], bodysh = fromList [("78",["81","79"])], posh = fromList [("11",[""]),("15",[""]),("19",[""]),("23",[""]),("3",[""]),("7",[""]),("79",[""]),("87",[""])], negh = fromList [("83",[""])], predsh = fromList [("11",["\"edge\""]),("15",["\"edge\""]),("19",["\"edge\""]),("23",["\"edge\""]),("3",["\"edge\""]),("7",["\"edge\""]),("79",["\"node\""]),("83",["\"oncycle\""]),("87",["\"edge\""])], varsh = fromList [("80",["\"X\""]),("84",["\"Y\""]),("85",["\"X\""]),("88",["\"Y\""]),("89",["\"X\""])], alisth = fromList [("11",[("2","13"),("1","12")]),("15",[("2","17"),("1","16")]),("19",[("2","21"),("1","20")]),("23",[("2","25"),("1","24")]),("3",[("2","5"),("1","4")]),("7",[("2","9"),("1","8")]),("79",[("1","80")]),("83",[("2","85"),("1","84")]),("87",[("2","89"),("1","88")])], tlisth = fromList [("81",[("2","86"),("1","82")])], typeh = fromList [("10","assert"),("11","pred"),("12","cnst"),("13","cnst"),("14","assert"),("15","pred"),("16","cnst"),("17","cnst"),("18","assert"),("19","pred"),("2","assert"),("20","cnst"),("21","cnst"),("22","assert"),("23","pred"),("24","cnst"),("25","cnst"),("3","pred"),("4","cnst"),("5","cnst"),("6","assert"),("7","pred"),("78","constraint"),("79","pred"),("8","cnst"),("80","var"),("81","composite"),("83","pred"),("84","var"),("85","var"),("87","pred"),("88","var"),("89","var"),("9","cnst")], quals = fromList [("82","83"),("86","87")], composedh = fromList [], boph = fromList [], largh = fromList [], rargh = fromList [], mkassigns = fromList [], rassigns = fromList [], ptrue = fromList [], pfalse = fromList [], xpand = fromList [], bexprh = fromList [], constsh = fromList [("12",["\"3\""]),("13",["\"1\""]),("16",["\"1\""]),("17",["\"3\""]),("20",["\"3\""]),("21",["\"2\""]),("24",["\"2\""]),("25",["\"1\""]),("4",["\"1\""]),("5",["\"2\""]),("8",["\"2\""]),("9",["\"3\""])], emptyh = fromList [("rulecomposite",[""]),("rulepred",[""]),("rulevar",[""])]},[])
+
 dereify' :: Either ParseError [Rules] -> Bool -> ([Rules], IntermediateR)
 dereify' rb ground = 
-   let hs = IntermediateR {
-       -- doground = True, 
-       doground = ground, 
-       rulesh = M.empty, hasrulesh = M.empty, 
-       headsh = M.empty, bodysh = M.empty, posh = M.empty, negh = M.empty,
-       predsh = M.empty, varsh = M.empty, alisth = M.empty, typeh = M.empty, 
-       largh = M.empty, rargh = M.empty, boph = M.empty, tlisth = M.empty, 
-       quals = M.empty, composedh = M.empty, mkassigns = M.empty, rassigns = M.empty,
-       bexprh = M.empty, constsh = M.empty, emptyh = M.empty
-       {-- 
-       denialsh = M.empty, factsh = M.empty, showsh = M.empty, gshowsh = M.empty,
-       hidesh = M.empty, ghidesh = M.empty, externalsh = M.empty, functionsh = M.empty, 
-       minimizesh = M.empty, maximizesh = M.empty, constsh = M.empty, computesh = M.empty, 
-       plainh = M.empty, cardh = M.empty, counth = M.empty, optimizeh = M.empty, typedh = M.empty, 
-       weighedh = M.empty, bexprh = M.empty, assignh = M.empty, assignmenth = M.empty, 
-       arityh = M.empty, emptyh = M.empty, numberh = M.empty, symh = M.empty, 
-       alternativeh = M.empty, arithh = M.empty, funch = M.empty, atomh = M.empty, consth = M.empty
-       --}
-    } in 
+   let hs = emptyIntermediate ground
+    in 
    case rb of 
         Left l -> ([],hs) -- [Empty] -- [Left l]
         --  Right r -> L.foldr (factitem r) [] (L.reverse r)
         Right r -> let x = L.foldr collect hs (L.reverse r) in 
-                   let y = pull x in 
+                   let y = pull x True in 
                        -- x
                        -- [y]
                        (y,x)
@@ -553,24 +701,8 @@ dereify' rb ground =
 
 dereify'' :: Either ParseError [Rules] -> IntermediateR
 dereify'' rb = 
-   let hs = IntermediateR {
-       doground = True, 
-       rulesh = M.empty, hasrulesh = M.empty, 
-       headsh = M.empty, bodysh = M.empty, posh = M.empty, negh = M.empty,
-       predsh = M.empty, varsh = M.empty, alisth = M.empty, typeh = M.empty, 
-       largh = M.empty, rargh = M.empty, boph = M.empty,tlisth = M.empty, 
-       quals = M.empty, composedh = M.empty, mkassigns = M.empty, rassigns = M.empty,
-       bexprh = M.empty, constsh = M.empty, emptyh = M.empty
-       {-- 
-       denialsh = M.empty, factsh = M.empty, showsh = M.empty, gshowsh = M.empty,
-       hidesh = M.empty, ghidesh = M.empty, externalsh = M.empty, functionsh = M.empty, 
-       minimizesh = M.empty, maximizesh = M.empty, constsh = M.empty, computesh = M.empty, 
-       plainh = M.empty, cardh = M.empty, counth = M.empty, optimizeh = M.empty, typedh = M.empty, 
-       weighedh = M.empty, bexprh = M.empty, assignh = M.empty, assignmenth = M.empty, 
-       arityh = M.empty, emptyh = M.empty, numberh = M.empty, symh = M.empty, 
-       alternativeh = M.empty, arithh = M.empty, funch = M.empty, atomh = M.empty, consth = M.empty
-       --}
-    } in 
+   let hs = emptyIntermediate True
+    in 
    case rb of 
         Left l -> hs
         --  Right r -> L.foldr (factitem r) [] (L.reverse r)
@@ -583,4 +715,57 @@ dereify :: Bool -> Either ParseError [Rules] -> String
 dereify ground x = 
     let (y,hs) = dereify' x ground in 
     txtrender ((Right (L.reverse y))::(Either ParseError [Rules]))
+
+--
+-- This returns the internal representation of parsed
+-- facts representing the reified program along with the 
+-- internal auxiliary hashtable. These are needed whenever
+-- we want to avoid recomputing this. 
+--
+basedreify ground x = 
+    let (y,hs) = dereify' x ground in 
+      (y,hs)                
+
+--
+-- Do a ground dereification using previously constructed
+-- Rulebase and intermediate hashes. 
+--
+-- dereifywithbase :: Either ParseError [Rules] -> [Rules] -> IntermediateR -> ([Rules], IntermediateR) 
+dereifywithbase prevrb prevhs rb  = 
+   -- let hs = emptyIntermediate ground
+   -- in 
+   case rb of 
+        Left l -> -- ([],prevhs) -- [Empty] -- [Left l]
+             []             
+        --  Right r -> L.foldr (factitem r) [] (L.reverse r)
+        Right r -> let x = L.foldr collect prevhs (L.reverse r) in 
+                   let y = pull x False in 
+                   -- let newy = prevrb ++ y in 
+                   let newy = y in 
+                       -- (newy,x)
+                       txtrender ((Right (L.reverse newy))::(Either ParseError [Rules]))
+
+--
+-- This is for debugging on the interpreter, we return 
+-- the internal representation rather than the 
+-- textual format. 
+-- dereifywithbase':: t -> IntermediateR -> Either t1 [Rules] -> (IntermediateR, [Rules])
+dereifywithbase' prevrb prevhs rb  = 
+   -- let hs = emptyIntermediate ground
+   -- in 
+   case rb of 
+        Left l -> -- ([],prevhs) -- [Empty] -- [Left l]
+             ((emptyIntermediate True),[],(emptyIntermediate True))
+        --  Right r -> L.foldr (factitem r) [] (L.reverse r)
+        Right r -> let x = L.foldr collect prevhs (L.reverse r) in 
+                   let y = pull x False in 
+                       (prevhs,y,x)
+
+-- May need to get fromList by  
+-- import Data.Map 
+-- ctlist  (IntermediateR {doground = True, hasrulesh = fromList [("1",["78","22","18","14","10","6","2"])], rulesh = fromList [], headsh = fromList [("10",["11"]),("14",["15"]),("18",["19"]),("2",["3"]),("22",["23"]),("6",["7"])], bodysh = fromList [("78",["81","79"])], posh = fromList [("11",[""]),("15",[""]),("19",[""]),("23",[""]),("3",[""]),("7",[""]),("79",[""]),("87",[""])], negh = fromList [("83",[""])], predsh = fromList [("11",["\"edge\""]),("15",["\"edge\""]),("19",["\"edge\""]),("23",["\"edge\""]),("3",["\"edge\""]),("7",["\"edge\""]),("79",["\"node\""]),("83",["\"oncycle\""]),("87",["\"edge\""])], varsh = fromList [("80",["\"X\""]),("84",["\"Y\""]),("85",["\"X\""]),("88",["\"Y\""]),("89",["\"X\""])], alisth = fromList [("11",[("2","13"),("1","12")]),("15",[("2","17"),("1","16")]),("19",[("2","21"),("1","20")]),("23",[("2","25"),("1","24")]),("3",[("2","5"),("1","4")]),("7",[("2","9"),("1","8")]),("79",[("1","80")]),("83",[("2","85"),("1","84")]),("87",[("2","89"),("1","88")])], tlisth = fromList [("81",[("2","86"),("1","82")])], typeh = fromList [("10","assert"),("11","pred"),("12","cnst"),("13","cnst"),("14","assert"),("15","pred"),("16","cnst"),("17","cnst"),("18","assert"),("19","pred"),("2","assert"),("20","cnst"),("21","cnst"),("22","assert"),("23","pred"),("24","cnst"),("25","cnst"),("3","pred"),("4","cnst"),("5","cnst"),("6","assert"),("7","pred"),("78","constraint"),("79","pred"),("8","cnst"),("80","var"),("81","composite"),("83","pred"),("84","var"),("85","var"),("87","pred"),("88","var"),("89","var"),("9","cnst")], quals = fromList [("82","83"),("86","87")], composedh = fromList [], boph = fromList [], largh = fromList [], rargh = fromList [], mkassigns = fromList [], rassigns = fromList [], ptrue = fromList [], pfalse = fromList [], xpand = fromList [], bexprh = fromList [], constsh = fromList [("12",["\"3\""]),("13",["\"1\""]),("16",["\"1\""]),("17",["\"3\""]),("20",["\"3\""]),("21",["\"2\""]),("24",["\"2\""]),("25",["\"1\""]),("4",["\"1\""]),("5",["\"2\""]),("8",["\"2\""]),("9",["\"3\""])], emptyh = fromList [("rulecomposite",[""]),("rulepred",[""]),("rulevar",[""])]}) "81"
+
+-- This may be the good one 
+-- ctlist  (IntermediateR {doground = True, hasrulesh = fromList [("1",["78","22","18","14","10","6","2"])], rulesh = fromList [], headsh = fromList [("10",["11"]),("14",["15"]),("18",["19"]),("2",["3"]),("22",["23"]),("6",["7"])], bodysh = fromList [("78",["81","79"])], posh = fromList [("11",[""]),("15",[""]),("19",[""]),("23",[""]),("3",[""]),("7",[""]),("79",[""]),("87",[""])], negh = fromList [("83",[""])], predsh = fromList [("11",["\"edge\""]),("15",["\"edge\""]),("19",["\"edge\""]),("23",["\"edge\""]),("3",["\"edge\""]),("7",["\"edge\""]),("79",["\"node\""]),("83",["\"oncycle\""]),("87",["\"edge\""])], varsh = fromList [("80",["\"X\""]),("84",["\"Y\""]),("85",["\"X\""]),("88",["\"Y\""]),("89",["\"X\""])], alisth = fromList [("11",[("2","13"),("1","12")]),("15",[("2","17"),("1","16")]),("19",[("2","21"),("1","20")]),("23",[("2","25"),("1","24")]),("3",[("2","5"),("1","4")]),("7",[("2","9"),("1","8")]),("79",[("1","80")]),("83",[("2","85"),("1","84")]),("87",[("2","89"),("1","88")])], tlisth = fromList [("81",[("2","86"),("1","82")])], typeh = fromList [("10","assert"),("11","pred"),("12","cnst"),("13","cnst"),("14","assert"),("15","pred"),("16","cnst"),("17","cnst"),("18","assert"),("19","pred"),("2","assert"),("20","cnst"),("21","cnst"),("22","assert"),("23","pred"),("24","cnst"),("25","cnst"),("3","pred"),("4","cnst"),("5","cnst"),("6","assert"),("7","pred"),("78","constraint"),("79","pred"),("8","cnst"),("80","var"),("81","composite"),("83","pred"),("84","var"),("85","var"),("87","pred"),("88","var"),("89","var"),("9","cnst")], quals = fromList [("82","83"),("86","87")], composedh = fromList [], boph = fromList [], largh = fromList [], rargh = fromList [], mkassigns = fromList [], rassigns = fromList [], ptrue = fromList [], pfalse = fromList [], xpand = fromList [("81",fromList [("11",fromList [("\"X\"","\"1\""),("\"Y\"","\"3\"")]),("15",fromList [("\"X\"","\"3\""),("\"Y\"","\"1\"")]),("19",fromList [("\"X\"","\"2\""),("\"Y\"","\"3\"")]),("23",fromList [("\"X\"","\"1\""),("\"Y\"","\"2\"")]),("3",fromList [("\"X\"","\"2\""),("\"Y\"","\"1\"")]),("7",fromList [("\"X\"","\"3\""),("\"Y\"","\"2\"")])])],bexprh = fromList [], constsh = fromList [("12",["\"3\""]),("13",["\"1\""]),("16",["\"1\""]),("17",["\"3\""]),("20",["\"3\""]),("21",["\"2\""]),("24",["\"2\""]),("25",["\"1\""]),("4",["\"1\""]),("5",["\"2\""]),("8",["\"2\""]),("9",["\"3\""])], emptyh = fromList [("rulecomposite",[""]),("rulepred",[""]),("rulevar",[""])]}) "81"
+
 

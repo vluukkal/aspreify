@@ -17,7 +17,7 @@
 -- tests/hamiltonian_cycle.lp.ssls
 -- 
 -- 
--- Copyright 2012 Vesa Luukkala
+-- Copyright 2012,2013 Vesa Luukkala
 -- 
 -- Permission is hereby granted, free of charge, to any person obtaining
 -- a copy of this software and associated documentation files (the
@@ -72,6 +72,13 @@ parsenrender fname renderer =
       let tree = parse rulebase "" (unpack (E.decodeUtf8With Err.lenientDecode istr)) in 
       let output = renderer tree in 
       return (show output)
+    }
+
+justparse fname = 
+    do {
+      istr <- B.readFile fname; 
+      let tree = parse rulebase "" (removecomm (unpack (E.decodeUtf8With Err.lenientDecode istr))) in 
+      return tree
     }
 
 removecomm :: String -> String 
@@ -129,6 +136,11 @@ undoreify fn1 fn2 ground =
     do 
       parsenrendernwrite fn1 fn2 (dereify ground)
 
+undoreify' fn1 fn2 baserls basehs =
+    do 
+      parsenrendernwrite fn1 fn2 (dereifywithbase baserls basehs)
+
+
 data Flag
     = Lparse                -- -l (default)
     | Rdf                   -- -r
@@ -136,8 +148,10 @@ data Flag
     | Idreuse               -- -i
     | Dereify               -- -d 
     | Ground                -- -g
+    | Base String           -- -b the basefilename for grounding 
     | Help                  -- --help
-    deriving (Eq,Ord,Enum,Show,Bounded)
+    -- deriving (Eq,Ord,Enum,Show,Bounded)
+    deriving (Eq,Ord,Show)
 
 flags =
    [Option ['l'] []       (NoArg Lparse)
@@ -151,6 +165,8 @@ flags =
    ,Option ['d'] []       (NoArg Dereify)
         "Reads in a reified set of facts and constructs reconstructs nonreified ruleset."
    ,Option ['g'] []       (NoArg Ground)
+        "Reads in a reified set of facts along with variable assignments and performs related grounding."
+   ,Option ['b'] []       (ReqArg Base "BASE") -- (NoArg Ground)
         "Reads in a reified set of facts along with variable assignments and performs related grounding."
    ,Option []    ["help"] (NoArg Help)
         "Print this help message"
@@ -167,37 +183,99 @@ parseopts argv =
    (_,_,errs)      -> do
         System.IO.hPutStrLn stderr (List.concat errs ++ usageInfo header flags)
         exitWith (ExitFailure 1)
-   where header = "Usage: aspparse [-l|r|t|d|g] [file ...]"
+   where header = "Usage: aspparse [-l|r|t|d|g|b] [file ...]"
          set Lparse      = [Lparse] 
          set Rdf      = [Rdf] 
          set Test      = [Test] 
          set Dereify      = [Dereify] 
          set Ground      = [Ground] 
+         set (Base s)     = [Base s] 
          set f      = [f] 
 
-handleafile otype other f = 
+handleafile otype other baserules basehs f = 
  case otype of 
  [Rdf] -> do 
        let tmpfname = (f ++ ".tmp") 
        let outfile = (f ++ ".ssls") 
        -- putStrLn ("tossls " ++ show(f) ++ " " ++ show(tmpfname) ++ " " ++ show(outfile))
        tossls f tmpfname outfile 
+       -- return ""
  [Test] -> do
        let loopbackfile = (f ++ ".lp") 
        -- putStrLn ("backtolp " ++ show(f) ++ " " ++ show(loopbackfile))
        backtolp f loopbackfile
+       -- return ""
  [Dereify] -> do 
       let dereifiedfile = (f ++ ".dereified") 
       undoreify f dereifiedfile False
+      -- return ""
  [Ground] -> do 
       let dereifiedfile = (f ++ ".ground") 
       undoreify f dereifiedfile True
-      
+      -- return ""
+ [Base s] -> do 
+      let dereifiedfile = (f ++ ".ground") 
+      undoreify' f dereifiedfile baserules basehs
+      -- return ""
  _ -> do -- default is [Lparse]
       let reifiedfile = (f ++ ".reified") 
       -- putStrLn ("reify " ++ show(f) ++ " " ++ show(reifiedfile))
       let mkid = (List.elem Idreuse other)
       reify f reifiedfile mkid
+      -- return ""
+
+-- handleafile' :: [Flag] -> [Flag] -> (Bool, IO [t], t1) -> [Char] -> IO (t, t1)
+-- There's an emptyset in 2nd elemnt of the triple, but as it is a 
+-- IO Rules and we should be able to look inside IO to compare. 
+-- Blargh, as a kludge we have a dedicated boolean element. 
+handleafile' otype other (d,rls,hs) f = 
+ do
+   System.IO.hPutStrLn stderr ("BOO")
+   case otype of 
+    [Rdf] -> do 
+       let tmpfname = (f ++ ".tmp") 
+       let outfile = (f ++ ".ssls") 
+       -- putStrLn ("tossls " ++ show(f) ++ " " ++ show(tmpfname) ++ " " ++ show(outfile))
+       tossls f tmpfname outfile 
+       return (d,rls,hs)
+    [Test] -> do
+       let loopbackfile = (f ++ ".lp") 
+       -- putStrLn ("backtolp " ++ show(f) ++ " " ++ show(loopbackfile))
+       backtolp f loopbackfile
+       return (d,rls,hs)
+    [Dereify] -> do 
+      let dereifiedfile = (f ++ ".dereified") 
+      undoreify f dereifiedfile False
+      return (d,rls,hs)
+    [Ground] -> do 
+      let dereifiedfile = (f ++ ".ground") 
+      undoreify f dereifiedfile True
+      return (d,rls,hs)
+    [Base s] -> do 
+      let basefilename = List.head(List.words s)
+      let baseparse = (justparse basefilename) 
+      let (d,rls,hs) = if d then (d,rls,hs) 
+                       else (True, (justparse basefilename), hs)
+      -- rls::IO (Either ParseError [Rules])
+      System.IO.hPutStrLn stderr ("Using " ++ s ++ " as base")
+      -- let dereifiedfile = (s ++ ".ground") 
+      let dereifiedfile = (basefilename ++ ".ground") 
+      -- undoreify' f dereifiedfile True
+      undoreify s f True
+      return (d,rls,hs)
+    _ -> do -- default is [Lparse]
+      System.IO.hPutStrLn stderr ("Doing " ++ show(otype))
+      let reifiedfile = (f ++ ".reified") 
+      -- putStrLn ("reify " ++ show(f) ++ " " ++ show(reifiedfile))
+      let mkid = (List.elem Idreuse other)
+      reify f reifiedfile mkid
+      return (d,rls,hs)
+
+-- Should be as where underneath
+isbase x = 
+   case x of 
+        Base s -> True
+        _ -> False
 
 -- Urgh, parseopts should be able to do this 
 -- Separate between arguments for output type
@@ -208,8 +286,76 @@ separateargs args =
                     | x == Test = True
                     | x == Dereify = True
                     | x == Ground = True
+                    | isbase x = True
                     | otherwise = False  
 
+-- There must a better way of doing this without a function 
+-- mkio :: Monad m => a -> m a
+mkio i = 
+     do 
+        return i
+
+groundbase :: [[Flag]] -> IO ([Rules], IntermediateR)
+groundbase flags = 
+     case flags of 
+        h:rest -> do 
+               (rls,hs) <- dobase h
+               if rls == [] then (groundbase rest) else return (rls,hs)
+        [] -> do 
+               return ([],(DeReify.emptyIntermediate True))
+{--
+     -- : IO ([Rules], IntermediateR) -> IO ([Rules], IntermediateR)
+     let a = List.foldr dobase files [] in 
+     -- let a = List.foldl dobase files [] in  -- wont work?
+       a
+--}
+
+-- We do two things; firstly, create the internal representation 
+-- of the rules, the parsetree and mapping of IDs to elements.
+-- Secondly, we dereify the basefile to rules. The former are used
+-- as cache to avoid rereading the same rules for each answer set,
+-- the latter is used as prefix when concatenating all results 
+-- together. 
+-- The the flag is not the basefile, nothing is done, we return 
+-- empty rules and empty internal mappings. 
+dobase :: [Flag] -> IO ([Rules], IntermediateR)
+dobase i  = 
+     case i of 
+       [Base s] -> do 
+                  let basefilename = List.head(List.words s)
+                  baseparse <- (justparse basefilename) 
+                  -- Next we dereify this parsed file 
+                  let (rls,hs) = DeReify.basedreify True baseparse 
+                  System.IO.hPutStrLn stderr ("Using " ++ s ++ " as base")
+                  undoreify s (s ++ ".ground") True
+                  {--
+                  System.IO.hPutStrLn stderr (show(baseparse))
+                  System.IO.hPutStrLn stderr ("-------------------------------------")
+                  System.IO.hPutStrLn stderr (show(rls))
+                  System.IO.hPutStrLn stderr ("-------------------------------------")
+                  System.IO.hPutStrLn stderr (show(hs))
+                  System.IO.hPutStrLn stderr ("-------------------------------------")
+                  --}
+                  return (rls,hs)
+       otherwise -> return ([],(DeReify.emptyIntermediate True))
+
+-- debugbase "/Users/vluukkal/src/aspreify/metaeval/hamilton/01212013_100859/output/tlist.lp.reified" "/Users/vluukkal/src/aspreify/metaeval/hamilton/01212013_100859/output/smres1.lp" 
+
+-- debugbase "/Users/vluukkal/src/aspreify/metaeval/hamilton/01232013_225648/output/tlist.lp.reified" "/Users/vluukkal/src/aspreify/metaeval/hamilton/01232013_225648/output/smres1.lp" 
+
+-- dereifywithbase = parsenrendernwrite fn1 fn2 (dereifywithbase baserls basehs)
+debugbase basefile cfile = 
+    do 
+       baseparse <- (justparse basefile) 
+       -- Next we dereify this parsed file 
+       let (rls,hs) = DeReify.basedreify True baseparse 
+       -- Now we do the actual dereify with the other file 
+       cfileparse <- (justparse cfile) 
+       -- Next we dereify this parsed file 
+       let (rls2,hs2) = DeReify.basedreify True cfileparse 
+       return (dereifywithbase' rls hs2 (Right rls2))
+
+       
 main = 
     do 
       (args,files) <- getArgs >>= parseopts
@@ -219,7 +365,29 @@ main =
       if List.length outputtype > 1 
       then do System.IO.hPutStrLn stderr ("Only one output type permitted\n" ++ (usageInfo header flags))
               exitWith (ExitFailure 1)
-      else do mapM_ (handleafile outputtype other) files 
+      {-- --} 
+      else do 
+              -- System.IO.hPutStrLn stderr ("main: " ++ show(outputtype) ++ " : " ++ show(other) ++ " : " ++ show(files))
+              (baserules,basehs) <- dobase outputtype
+              mapM_ (handleafile outputtype other baserules basehs) files 
               exitWith ExitSuccess
-
+       {-- --}
+       {--
+      else do 
+              System.IO.hPutStrLn stderr ("main: " ++ show(outputtype) ++ " : " ++ show(other) ++ " : " ++ show(files))
+              -- let (baserls,basehs,files) = groundbase files in 
+              -- foldM_ (handleafile' outputtype other) ([],(DeReify.emptyIntermediate True)) files 
+              -- (baserules,basehs) <- groundbase outputtype
+              (baserules,basehs) <- dobase outputtype
+              foldM_ (handleafile' outputtype other) (False, (mkio (Right [])),(mkio (DeReify.emptyIntermediate True))::IO DeReify.IntermediateR) files 
+              -- foldM_ (handleafile' outputtype other) (False, (mkio ((Right [])),(DeReify.emptyIntermediate True))) files 
+              exitWith ExitSuccess
+         --}
+      {--
+         -- This does not work, but why?
+         -- Do we need still to 'evaluate' all in the end?
+      else do 
+              let all = mapM (handleafile outputtype other) files 
+              exitWith ExitSuccess
+      --}
       where header = "Usage: aspparse [-l|r|t|d|g] [file ...]"
