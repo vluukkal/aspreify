@@ -1,7 +1,7 @@
 --
 -- Renderer to reified rules in an RDF/N3-like format. 
 -- 
--- Copyright 2012 Vesa Luukkala
+-- Copyright 2012,2013 Vesa Luukkala
 -- 
 -- Permission is hereby granted, free of charge, to any person obtaining
 -- a copy of this software and associated documentation files (the
@@ -288,6 +288,7 @@ rdfbody' rel parentid r accu =
              show (factid) ++ ",http://m3.org/rls#constval," ++ L.head (rdfbody' "http://m3.org/rls#hasbody" eid e [])]
     -- Empty -> accu ++ [" NONE "]
     Empty -> accu
+    Comment s -> accu
     Arity a n -> accu
 
 rdfitem id i accu =
@@ -296,9 +297,9 @@ rdfitem id i accu =
     let preflink = show(id) ++ ",http://m3.org/rls#partof," ++ show(ruleid) ++ "\n" in 
     case i of
       Rule b l -> accu ++ preflink ++ show(ruleid) ++ ",rdf:type,http://m3.org/rls#rule\n" ++
-           head(rdfbody' "" ruleid b []) ++ 
+           (if (L.null l) then "" else (head(rdfbody' "" ruleid b []) ++ 
                   (L.foldr (++) "" (L.foldr (rdfbody' "http://m3.org/rls#hasbody" ruleid) [] l)) ++ 
-                 "" 
+                  "" ))
       Deny l -> accu ++ preflink ++ show(ruleid) ++ ",rdf:type,http://m3.org/rls#constraint\n" ++
                 (L.foldr (++) "" (L.foldr (rdfbody' "http://m3.org/rls#hasbody" ruleid) [] l))
                 ++ 
@@ -315,7 +316,9 @@ rdfitem id i accu =
       Function l -> accu 
       Minimize l -> accu 
       Maximize l -> accu 
+      RComment s -> accu 
       Computes n l -> accu 
+      Emptyset -> accu 
       Consts l -> accu ++ preflink ++ show(ruleid) ++ ",rdf:type,http://m3.org/rls#constdef\n" ++
                  (L.foldr (++) "" (L.foldr (rdfbody' "http://m3.org/rls#hasbody" ruleid) [] l))
 
