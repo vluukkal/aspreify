@@ -7,7 +7,22 @@ The purpose of this program is to parse textual answer set programs
 the input program as ASP facts, effectively reifying the input program
 allowing, among other things, ASP programs to be interpreted or
 modified by other ASP programs. The reified format can be converted back 
-to plain rules.
+to plain rules. Metaevaluator in ASP is provided as well. 
+
+Decomposing the the rules to facts allows e.g. the metaevaluator to reason
+over and maintain the provenance of information as well as the rules
+themselves, which is important in distributed reasoning.
+
+For more elaboration: 
+@inproceedings{DBLP:conf/rr/JanhunenL12,
+  author    = {Tomi Janhunen and
+               Vesa Luukkala},
+  title     = {Meta Programming with Answer Sets for Smart Spaces},
+  booktitle = {RR},
+  year      = {2012},
+  pages     = {106-121},
+  ee        = {http://dx.doi.org/10.1007/978-3-642-33203-6_9},
+}
 
 Vesa Luukkala (vesa.luukkala@gmail.com), 29.11.2012 
 
