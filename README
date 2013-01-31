@@ -7,11 +7,17 @@ The purpose of this program is to parse textual answer set programs
 the input program as ASP facts, effectively reifying the input program
 allowing, among other things, ASP programs to be interpreted or
 modified by other ASP programs. The reified format can be converted back 
-to plain rules. Metaevaluator in ASP is provided as well. 
+to plain rules. 
 
-Decomposing the the rules to facts allows e.g. the metaevaluator to reason
-over and maintain the provenance of information as well as the rules
-themselves, which is important in distributed reasoning.
+Decomposing the the rules to facts enables the evaluator to
+reason over and maintain the provenance of the source information as
+well as the rules themselves, which is important in distributed
+reasoning.
+
+An evaluator in ASP, a metaevaluator, allows specifying the semantics 
+within the same ASP framework. 
+An ASP metaevaluator for reified variable free ASP programs is provided,
+the variabled case is under construction, but emerging. 
 
 For more elaboration: 
 @inproceedings{DBLP:conf/rr/JanhunenL12,
