@@ -29,6 +29,7 @@ import qualified Data.List as L
 import qualified Data.Map as M
 import Data.Text
 
+
 import Control.Monad
 
 import Text.ParserCombinators.Parsec -- just to get the ParseError type
@@ -95,12 +96,23 @@ collectb rls bdy = Empty
 
 -- Obtain the nth argument of a::[MyExpr], assuming it is 
 -- either a Sym (Var String) or Sym (Const String) or Number (Const String)
-getarg :: [MyExpr] -> Int -> String
-getarg a n = 
+-- Old one with !!
+getarg' :: [MyExpr] -> Int -> String
+getarg' a n = 
   let elem = a!!n in 
   case elem of 
        Sym (Const s) -> s
        Number (Const s) -> s
+
+getarg :: [MyExpr] -> Int -> String
+getarg a n = 
+  let mylen = L.length a in  
+  if n > mylen then 
+       ("getarg found no index " ++ show(n))
+  else let elem = a!!n in 
+       case elem of 
+           Sym (Const s) -> s
+           Number (Const s) -> s
 
 -- Here we dispatch based on the name of the reified predicate 
 -- The types of the hashes could be changed, but would it just make life
@@ -396,6 +408,17 @@ rendervars h =
 
 crule :: IntermediateR -> String -> [Rules] -> [Rules]
 crule hash key accu = 
+   let hdkm = M.lookup key (headsh hash) in 
+   let bdksm = M.lookup key (bodysh hash) in 
+   case (hdkm,bdksm) of 
+        (Just hdk, Just bdks) -> 
+              let hdc = chead hash (L.head hdk) in 
+              let bdls = L.foldr (cbody hash) [] bdks in 
+                  ((Rule hdc bdls):accu)
+        (_,_) -> ((RComment ("crule no key " ++ show(key))):accu)
+
+crule'' :: IntermediateR -> String -> [Rules] -> [Rules]
+crule'' hash key accu = 
    -- Unsafe, will raise exception if no such key, aka
    -- incomplete refied file ...
    let hdk = (headsh hash) M.! key in 
@@ -406,7 +429,15 @@ crule hash key accu =
        ((Rule hdc bdls):accu)
        -- (hdc:accu)
 
+
 cconstraint hash key accu = 
+   let bdksm = M.lookup key (bodysh hash) in 
+   case bdksm of 
+        Just bdks -> let bdls = L.foldr (cbody hash) [] bdks in 
+               ((Deny bdls):accu)
+        Nothing -> ((RComment ("cconstraint no key " ++ show(key))):accu)
+
+cconstraint' hash key accu = 
    -- Unsafe, will raise exception if no such key, aka
    -- incomplete refied file ...
    let bdks = (bodysh hash) M.! key in 
@@ -414,6 +445,14 @@ cconstraint hash key accu =
        ((Deny bdls):accu)
 
 cassert hash key accu = 
+   let hdkm = M.lookup key (headsh hash) in 
+   case hdkm of 
+        Just hdk -> 
+           let hdc = chead hash (L.head hdk) in 
+               ((Fact [hdc]):accu)
+        Nothing -> ((RComment ("cassert no key " ++ show(key))):accu)
+
+cassert' hash key accu = 
    -- Unsafe, will raise exception if no such key, aka
    -- incomplete refied file ...
    let hdk = (headsh hash) M.! key in 
@@ -421,8 +460,23 @@ cassert hash key accu =
        ((Fact [hdc]):accu)
        -- (hdc:accu)
 
+
 cbexpr :: IntermediateR -> String -> [Body] -> [Body]
 cbexpr hash key accu = 
+   let lftm = M.lookup key (largh hash) in 
+   let rgtm = M.lookup key (rargh hash) in 
+   let bopm = M.lookup key (boph hash) in 
+   case (lftm,rgtm,bopm) of 
+        (Just lft, Just rgt, Just bop) -> 
+              let lft' = cexpr hash lft in 
+              let rgt' = cexpr hash rgt in 
+                  ((BExpr (tobop (rmquot bop)) lft' rgt'):accu)
+        (_,_,_) -> ((Comment ("cbexpr, no key " ++ show(key))):accu)
+       -- ((Rule hdc bdls):accu)
+
+-- With no err check 
+cbexpr' :: IntermediateR -> String -> [Body] -> [Body]
+cbexpr' hash key accu = 
    let lft = (largh hash) M.! key in 
    let rgt = (rargh hash) M.! key in 
    let bop = (boph hash) M.! key in 
@@ -457,7 +511,8 @@ cbody hash key accu =
       Just a -> 
            let isnegated = M.lookup key (negh hash) in 
            case isnegated of 
-             Nothing -> (Comment ("Dropped " ++ show(key))):accu -- accu 
+             -- Nothing -> (Comment ("Potentially true and redendant " ++ show(key))):accu -- accu 
+             Nothing -> (Comment ("Potentially true and redendant " ++ show(key))):((actualbody hash key accu)) -- accu 
              Just a -> actualbody hash key accu 
     where 
       actualbody hash key accu = 
@@ -490,17 +545,38 @@ We need to rewrite this to a set of plain facts with the
 variables coming from the boundexpandvv, maybe.  
 --}
 {-- --}
-ctlist :: IntermediateR -> String -> [Body]
-ctlist h k = 
+ctlist'' :: IntermediateR -> String -> [Body]
+ctlist'' h k = 
     let args = (tlisth h) M.! k in 
     let oargs = L.sortBy myc args in -- order by index, [(idx,id)]
     -- now get the first entry, which is the template to be filled in 
     -- by the following grounding phase 
-    let tmplt = oargs L.!! 0 in
-    -- The rest of them contain the templates by which the template
-    -- needs to be instantiated.  
-    let rest = L.tail oargs in 
-      (instantiatectlist h k tmplt rest) ++ [(Comment ("ctlist for " ++ show(k) ++ " with initial " ++ show(tmplt)) )]
+    if (L.length oargs) == 0 then []
+    else 
+      let tmplt = oargs L.!! 0 in
+      -- The rest of them contain the templates by which the template
+      -- needs to be instantiated.  
+      let rest = L.tail oargs in 
+        (instantiatectlist h k tmplt rest) ++ [(Comment ("ctlist for " ++ show(k) ++ " with initial " ++ show(tmplt)) )]
+    where 
+      myc (i1,v1) (i2,v2) = i1 `compare` i2
+
+ctlist :: IntermediateR -> String -> [Body]
+ctlist h k = 
+    let argsm = M.lookup k (tlisth h) in 
+    case argsm of 
+       Just args -> 
+            let oargs = L.sortBy myc args in -- order by index, [(idx,id)]
+            -- now get the first entry, which is the template to be filled in 
+            -- by the following grounding phase 
+            if (L.length oargs) == 0 then []
+            else 
+                 let tmplt = oargs L.!! 0 in
+                 -- The rest of them contain the templates by which the template
+                 -- needs to be instantiated.  
+                 let rest = L.tail oargs in 
+                     (instantiatectlist h k tmplt rest) ++ [(Comment ("ctlist for " ++ show(k) ++ " with initial " ++ show(tmplt)) )]
+       Nothing -> [Comment ("ctlist, no such key " ++ show(k))]
     where 
       myc (i1,v1) (i2,v2) = i1 `compare` i2
 {-- --}
@@ -560,19 +636,22 @@ instantiatectlist h k (idx,id) l =
    
 targl h (idx,v) accu = 
     let tmp = (quals h) in 
-    let nxt = tmp M.! v in 
-    let nxtb = cbody h nxt [] in 
-        (idx,L.head(nxtb)):accu
+    let nxtm = M.lookup v tmp in 
+    case nxtm of 
+      Just nxt -> let nxtb = cbody h nxt [] in 
+           (idx,L.head(nxtb)):accu
+      Nothing -> accu 
 
 targl' h (idx,v) accu = 
     let tmp = (quals h) in 
     let nxt = tmp M.! v in 
-    let nxtb = Plain (Const nxt) [] True in 
-        (idx,nxtb):accu
+    let nxtb = cbody h nxt [] in 
+        (idx,L.head(nxtb)):accu
 
 
-cpred :: IntermediateR -> String -> Body
-cpred h k = 
+
+cpred'' :: IntermediateR -> String -> Body
+cpred'' h k = 
     let pn = (predsh h) M.! k in 
     let args = (alisth h) M.! k in 
     let args' = L.foldr (argl h) [] args in -- We need to translate [(idx,Atom)] to [MyExpr]
@@ -583,6 +662,24 @@ cpred h k =
     -- let oargs'' = L.map (cexpr h) oargs' in     
     let ispos = (M.member k (negh h)) in -- && (not (M.member k (posh h) )) in 
       (Plain (Const (rmquot (L.head pn))) oargs' (not ispos))
+    where 
+      myc (i1,v1) (i2,v2) = i1 `compare` i2
+
+cpred :: IntermediateR -> String -> Body
+cpred h k = 
+    let pnm = M.lookup k (predsh h) in 
+    let argsm = M.lookup k (alisth h) in 
+    case (pnm, argsm) of 
+         (Just pn, Just args) -> 
+             let args' = L.foldr (argl h) [] args in -- We need to translate [(idx,Atom)] to [MyExpr]
+             let oargs = L.sortBy myc args' in -- order by index 
+             let (_,oargs') = L.unzip oargs in 
+             -- let oargs'' = L.map (\i -> (Sym i)) oargs' in     
+             -- let oargs'' = L.map (\i -> (cexpr h) i ) oargs' in     
+             -- let oargs'' = L.map (cexpr h) oargs' in     
+             let ispos = (M.member k (negh h)) in -- && (not (M.member k (posh h) )) in 
+             (Plain (Const (rmquot (L.head pn))) oargs' (not ispos))
+         (_,_) -> (Comment ("cpred: no key " ++ show(k) ))
     where 
       myc (i1,v1) (i2,v2) = i1 `compare` i2
         
@@ -640,12 +737,22 @@ cvar hash key  =
         Just vname -> ground hash (L.head vname)
         Nothing -> (Sym (Const ("Error no variable ID:" ++ show(key))))
 
-cconst hash key = 
+cconst' hash key = 
    -- Unsafe, will raise exception if no such key, aka
    -- incomplete refied file ...
    let hdk = (constsh hash) M.! key in 
        -- (Number (Const (rmquot (L.head hdk))))
        (Sym (Const (rmquot (L.head hdk))))
+
+cconst hash key = 
+   -- Unsafe, will raise exception if no such key, aka
+   -- incomplete refied file ...
+   let hdkm = M.lookup key (constsh hash) in 
+      case hdkm of 
+           Just hdk -> -- (Number (Const (rmquot (L.head hdk))))
+                       (Sym (Const (rmquot (L.head hdk))))
+           Nothing -> (Sym (Const ("Error no const ID:" ++ show(key))))
+
 
 {--
 argl h (idx,v) accu = 
