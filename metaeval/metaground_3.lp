@@ -89,7 +89,7 @@ boundvn(Vn) :- boundv(Rid,Vn,Preid,Jpredid).
   
 
 % Cannot be that we bind to variable with different values
-bar :- 
+foo :- 
   boundv(Rid,Vn,Predid1,Jpredid1),
   alist(Jpredid1, N1, Cid1), 
   cnst(Cid1,Val1),
@@ -99,6 +99,11 @@ bar :-
   Val1 != Val2,
   Predid1 != Predid2,
   Jpredid1 != Jpredid2.
+
+:- 
+  mkassign(Rid,Vname,Val1),
+  mkassign(Rid,Vname,Val2),
+  Val1 != Val2.
 
 % The argument cardinality 
 maxcard(P,Nmax) :- 
