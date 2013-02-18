@@ -98,6 +98,36 @@ notunmapped(Rid) :-
    rulepred(Rid,Predid), 
    not qualpred(Predid). 
 
+% There is a potential variable binding in the rule Rid
+% This is just potential, this may be problematic when 
+% later on we want to constrain this...
+potbinding(Rid) :- 
+    % First there is a relevant rule with a predicate
+    need_var_bindings(Rid), 
+    rulepred(Rid,Predid), % Thes two are a bit redundant, could be in need_*
+    not qualpred(Predid),
+    pred(Predid,Pn), 
+    % Then there is a relevant ground predicate with th same name 
+    assert(Aid), 
+    rulepred(Aid,Jpredid), 
+    pred(Jpredid,Pn). 
+
+% Now we want to say that it cant be that there is a potential 
+% binding and there is no sbindit for it. 
+missedpotential(Rid) :- 
+    potbinding(Rid), 
+    not sbindit(Rid,Predid,Jpredid), 
+    rulepred(Rid,Predid), 
+    assert(Aid),
+    rulepred(Aid,Jpredid). 
+
+% Can't be that there is missedpotential and unmapped predicates
+% THis forces us to generate mapped()'s (hence sbind's). 
+:- 
+    missedpotential(Rid), 
+    rulepred(Rid,Predid), 
+    unmapped(Predid).
+
 % Get the variables which have been assigned by sbindit 
 boundv(Rid,Vn,Predid,Jpredid) :- 
    sbindit(Rid,Predid,Jpredid), 
