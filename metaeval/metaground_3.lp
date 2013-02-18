@@ -13,6 +13,11 @@ nonfact(R) :- rule(R), body(R,A).
 nonfact(R) :- rule(R), head(R,H),alist(H,N,V),var(V,S). 
 poscond(R,A) :- rule(R), body(R,A), pos(A). 
 
+% Also handle constraints 
+nonfact(R) :- constraint(R), body(R,A).
+poscond(R,A) :- constraint(R), body(R,A), pos(A). 
+
+
 fact(A) :- assert(A). % , not nonfact(A). 
 
 fact(R) :- head(R,H), rule(R), not nonfact(R). % not body(R,_).
@@ -36,14 +41,18 @@ vsbindit(Prednm,Predid,Jpredid) :- sbindit(Rid,Predid,Jpredid), pred(Predid,Pred
 % Now limit them 
 
 % Cannot be that justifying predicate is of different name 
-:- sbindit(Rid,Predid,Jpredid),
+:- nodiffname(Rid). 
+nodiffname(Rid) :- 
+   need_var_bindings(Rid), 
+   sbindit(Rid,Predid,Jpredid),
    pred(Predid,Pn1),
    pred(Jpredid,Pn2),
    Pn1 != Pn2.
 
 
 % Do not assign two different justifications to one Predid
-:- 
+:- nodiffjusts(Rid). 
+nodiffjusts(Rid) :- 
    sbindit(Rid,Predid,Jpredid1),
    sbindit(Rid,Predid,Jpredid2),
    Jpredid1 != Jpredid2.
@@ -70,7 +79,19 @@ qualpred(Predid) :-
 % Actually, we may want to say that, we deny this 
 % for rules that have been grounded and have 
 % variables which are outside of the typed list.  
-:- 
+% eight(Rid) :- 
+
+:- notunmapped(Rid).  % YYY
+notunmapped(Rid) :- 
+   % need_var_bindings(Rid), 
+   % not need_conj_bindings(Rid), 
+
+   % If there is a conjunction then not all are needed
+   % Ths does not sound right, a conjunctive would leave
+   % stuff not fully generated
+   % not exists_mkassign_conj, 
+   mapped(PredidX),  % there cannot be a unmapped without a mapped 
+                     % but if there is no mapped then this wont work 
    unmapped(Predid), % This is want we want, but now we try to make it less global
    % All of below states that we should not count predicates inside conjunction 
    % to this constraint. 
@@ -91,32 +112,34 @@ boundvv(Rid,Vn,Val,Predid,Jpredid) :-
    alist(Jpredid,N,Cid),
    cnst(Cid,Val).
 
-mkassign(R,A,C) :- boundvv(R,A,C,Predid,Jpredid).
+mkassign_var(R,A,C) :- boundvv(R,A,C,Predid,Jpredid).
 
 boundvn(Vn) :- boundv(Rid,Vn,Preid,Jpredid).
 
 % There cannot be a variable name, which does not have 
 % a bound. 
 % This could also kill everything 
-foo :-
-  ground(Rid),
-  rulevar(Rid,Vid),
-  var(Vid,Vn),
-  not boundvn(Vn).
+%foo :-
+%  ground(Rid),
+%  rulevar(Rid,Vid),
+%  var(Vid,Vn),
+%  not boundvn(Vn).
   
 
 % Cannot be that we bind to variable with different values
-:- 
-  mkassign(Rid,Vname,Val1),
-  mkassign(Rid,Vname,Val2),
+:- nodiffvarass(Rid).  % YYY
+nodiffvarass(Rid) :- 
+  need_var_bindings(Rid), 
+  mkassign_var(Rid,Vname,Val1),
+  mkassign_var(Rid,Vname,Val2),
   Val1 != Val2.
 
 % The argument cardinality 
-maxcard(P,Nmax) :- 
-  pred(X,P),
-  alist(X,Nmax,Y1),
-  alist(X,Nother,Y2),
-  Nmax > Nother.
+%maxcard(P,Nmax) :- 
+%  pred(X,P),
+%  alist(X,Nmax,Y1),
+%  alist(X,Nother,Y2),
+%  Nmax > Nother.
 
 qualvar(Rid,Vid) :- 
   rulevar(Rid,Vid), 
@@ -163,7 +186,9 @@ nonqualvar(Rid,Vid,Vn) :-
     xpand(Rid,Predid,Jpredid,Tlist,N),
     selected(Jpredid).
 
-:- 
+:- dontmissexpand(Rid). % YYY
+dontmissexpand(Rid) :- 
+    need_conj_bindings(Rid), 
     not xpand2(Rid,Predid,Jpredid,Tlist,N), 
     xpand(Rid,Predid,Jpredid,Tlist,N),
     selected(Jpredid). 
@@ -252,7 +277,6 @@ extcflct(Rid,Pn1,Jpredid1,Jpredid2) :-
 % Pick justifications which have same values 
 % We want to pick many but we only get one. 
 expjust(Jpredid) :-
-%{expjust(Jpredid)} :-
     not otherexpjust(Jpredid), 
     xpand(Rid,Predid,Jpredid,Tlistid,Nt). 
 
@@ -270,7 +294,9 @@ otherexpjust(Jpredid1) :-
 % Weed out stuff, there cannot be externally conflicting stuff.
 % Note that this cannot be global either, when combining with the 
 % variable assignment. 
-:- 
+:- notextcflct(Rid). % YYY
+notextecflct(Rid) :- 
+   need_conj_bindings(Rid),
    selected(J1),
    selected(J2), 
    J1 != J2, 
@@ -290,7 +316,9 @@ otherexpjust(Jpredid1) :-
 % valuation is left out. 
 % A global constraint, caveat emptor... 
 % missingjust(J1,J2) :- 
-:- 
+:- notleftout(Rid).  % YYY
+notleftout(Rid) :- 
+   need_conj_bindings(Rid),
    selected(J1), 
    not selected(J2),
    J1 != J2, 
@@ -300,39 +328,12 @@ otherexpjust(Jpredid1) :-
 % Again, a global which is not good. 
 % :- missingjust(J1,J2).
 
-% Only allow those xpands which agree on the constraints 
-% Cannot be that two expands differ on the value of a 
-% constrained variable. 
-badx(Vn,Val1,N1,Predid1,Tlist1,Jpredid1,Nt1) :- 
-   xpandnv(Rid,Pn1,Vn,Val1,N1,Predid1,Tlist1,Jpredid1,Nt1),
-   xpandnv(Rid,Pn2,Vn,Val2,N2,Predid2,Tlist2,Jpredid2,Nt2),
-   constrainedvar(Rid,Vn), 
-   Val1 != Val2. 
-
-%  xpandnv(Rid,Pn1,Vn1,Val,Predid1,Tlist1,Jpredid1,Nt1), 
-%  xpandnv(Rid,Pn2,Vn2,Val,Predid2,Tlist2,Jpredid2,Nt2), 
-
-% Now check the compatibility with any variable bound outside
-% of the typed list. 
-% extdisagree(Vn,Val1,Jpredid1,Jpredid2,Val2,Nt1,Nt2) :- 
-extdisagree(Vn,Val1,Jpredid1,Jpredid2,Val2) :- 
-   nonqualvar(Rid,Vid,Vn),
-   %boundexxxpandvv(Rid,Pn,Vn,Val1,Predid1,Tlist1,Jpredid1,Nt1), 
-   boundexxxpandvv(Rid,Pn,Vn,Val1,Predid1,Tlist1,Jpredid1), 
-   %boundexxxpandvv(Rid,Pn,Vn,Val2,Predid2,Tlist2,Jpredid2,Nt2), 
-   boundexxxpandvv(Rid,Pn,Vn,Val2,Predid2,Tlist2,Jpredid2), 
-   Val1 != Val2. 
-
-extagree(Vn,Val1,Jpredid1,Jpredid2,Val2) :- 
-   nonqualvar(Rid,Vid,Vn),
-   boundexxxpandvv(Rid,Pn,Vn,Val1,Predid1,Tlist1,Jpredid1), 
-   boundexxxpandvv(Rid,Pn,Vn,Val2,Predid2,Tlist2,Jpredid2), 
-   Jpredid1 != Jpredid2,
-   Val1 == Val2. 
-
 % Cannot be that there is a justification with the same name 
 % but it is not covered by xpand. 
-:- 
+
+:- notcovered(Rid). % YYY
+notcovered(Rid) :- 
+   need_conj_bindings(Rid),
    % There is an assertion for a particular name
    assert(Aid),
    rulepred(Aid,Jpredid), 
@@ -354,91 +355,14 @@ cflctb(Rid,Predid,Jpredid1,Jpredid2,Tlist1,Tlist2,N) :-
 
 % Then we generate a single one for all of them 
 % Jpredid1 is unique,we generate as many as there are Jpredids
-1 {xxpand(Rid,Predid,Jpredid1,Tlist1,N)} 1 :- 
-  cflctb(Rid,Predid,Jpredid1,Jpredid2,Tlist1,Tlist2,N). 
+%1 {xxpand(Rid,Predid,Jpredid1,Tlist1,N)} 1 :- 
+%  cflctb(Rid,Predid,Jpredid1,Jpredid2,Tlist1,Tlist2,N). 
   
 % Now we pick one of these Jpredids
 % What if there are more than this one, which are pertinent?
 % The two below are for single valued px
 %px(Jpredid1) :- xxpand(Rid,Predid,Jpredid1,Tlist1,N), not otherpx(Jpredid1).
 %otherpx(Jpredid1) :- px(Jpredid2), assert(Aid), rulepred(Aid,Jpredid1), Jpredid1 != Jpredid2.
-
-% And then we pick one of them only 
-% 1 {xxxpand(Rid,Predid,Jpredid1,Tlist1) } 1 :- xxpand(Rid,Predid,Jpredid1,Tlist1), px(Jpredid1). 
-1 {xxxpand(Rid,Predid,Jpredid1,Tlist1) } 1 :- xxpand(Rid,Predid,Jpredid1,Tlist1,N). 
-
-% Can't be so that there is a xxxpand which disagrees on value of 
-% nonqualvar. 
-disagree_old(Vn,Val1,Jpredid1,Jpredid2,Val2) :- 
-   nonqualvar(Rid,Vid,Vn),
-   boundexxxpandvv(Rid,Pn,Vn,Val1,Predid1,Tlist1,Jpredid1), 
-   boundexxxpandvv(Rid,Pn,Vn,Val2,Predid2,Tlist2,Jpredid2), 
-   Val1 != Val2. 
-
-agree_old(Vn,Val1,Jpredid1,Jpredid2,Val2) :- 
-   nonqualvar(Rid,Vid,Vn),
-   boundexxxpandvv(Rid,Pn,Vn,Val1,Predid1,Tlist1,Jpredid1), 
-   boundexxxpandvv(Rid,Pn,Vn,Val2,Predid2,Tlist2,Jpredid2), 
-   Jpredid1 != Jpredid2,
-   Val1 == Val2. 
-
-% Generate separate answer sets for each justification ID
-% {agree2(Jpredid1)} :- agree(Vn,Val1,Jpredid1,Jpredid2,Val2).
-% {agree2(Jpredid2)} :- agree(Vn,Val1,Jpredid1,Jpredid2,Val2).
-% Ideally this should be used for xxxpand. 
-
-
-% Limit these so that in one answer set there can not 
-% be two different values for two different justifications. 
-% It seems that this produces single agree2 for single unique 
-% value. 
-% We could pick this and then expand to contain the 
-% similar values...
-% And we may still have too few of these, that is 
-% we may have zero,one agree2()'s
-%klank :-
-%  agree2(Jpredid1), 
-%  agree2(Jpredid2),
-%  Jpredid1 != Jpredid3, 
-%  agree(Vn,Val1,Jpredid1,Jpredid2,Val2), 
-%  agree(Vn,Val3,Jpredid3,Jpredid4,Val4),
-%  Val1 != Val3.
-
-% We should still make sure that agree2 is not missing anything
-% Cant be a agree1 with no agree2. 
-%:- 
-%  not agree2(Jpredid1), 
-%  agree(Vn,Vl1,Jpredid1,Jpredid2,Vl2).
-
-% prj1(Vn,Vl,J) :- agree(Vn,Vl,J,J2,V2).
-
-% Now try to pick (from prj1) those which have the same Vn Vl
-%{prj2(Vn,Vl,J1)} :- 
-%  prj1(Vn,Vl,J1),
-%  prj1(Vn,Vl,J2),
-%  J1 != J2. 
-  
-% There is a prj1 which is not in any of the 
-% prj2's.
-%orphanprj(Vn,Vl,J1) :- 
-%  prj1(Vn,Vl,J1), 
-%  not prj2(Vn,Vl,J1).
-
-
-% Get the variables which have been assigned by xxxpand
-% Here is the first time we have 
-boundxxxpand(Rid,Vn,Predid,Jpredid,Tlist) :- 
-   xxxpand(Rid,Predid,Jpredid,Tlist), 
-   alist(Predid,N,Vid), 
-   var(Vid,Vn). 
-
-boundexxxpandvv(Rid,Pn,Vn,Val,Predid,Tlist,Jpredid) :- 
-   boundxxxpand(Rid,Vn,Predid,Jpredid,Tlist),
-   alist(Predid,N,Vid),
-   pred(Predid,Pn),
-   var(Vid,Vn),
-   alist(Jpredid,N,Cid),
-   cnst(Cid,Val).
 
 
 %
@@ -449,9 +373,95 @@ boundexxxpandvv(Rid,Pn,Vn,Val,Predid,Tlist,Jpredid) :-
 %
 
 % For now, we generate mkassigns from the bindings. 
-mkassign(Rid,Vn,Val) :- 
+mkassign_conj(Rid,Vn,Val) :- 
     boundexpandvv(Rid,Pn,Vn,Val,Predid1,Tlist,Jpredid),
     cnstvar(Rid,Predid2,N,Vn,Nt).
+
+% Cannot be that we bind to variable with different values
+:- nodiffconjass(Rid).  % YYY
+nodiffconjass(Rid) :- 
+  need_conj_bindings(Rid), 
+  mkassign_conj(Rid,Vname,Val1),
+  mkassign_conj(Rid,Vname,Val2),
+  Val1 != Val2.
+
+% Determine what kind of mkassigns we need 
+need_conj_bindings(Rid) :-
+    ground(Rid), 
+    rulecomposite(Rid,C).
+
+need_var_bindings(Rid) :- 
+    ground(Rid), 
+    rulepred(Rid,Predid), 
+    not qualpred(Predid). 
+
+
+% Now state that both mkassigns must match, here we do not 
+% distinguish between which side is wrong, but since we assume 
+% that _conj is always more general the _var should constrain more 
+% one :- 
+:- notmatching(R). % YYY
+notmatching(R) :- 
+   need_conj_bindings(R), 
+   need_var_bindings(R), 
+   mkassign_var(R,A,C1),
+   mkassign_conj(R,A,C2),
+   C1 != C2. 
+
+% We should still say that both must be present. 
+% it seems that _var is more common 
+% But this is the case if there are conjuncted variables. 
+:- notboth(R). % YYY
+notboth(R) :- 
+   need_conj_bindings(R), 
+   % need_var_bindings(R), 
+   mkassign_var(R,A,C1),
+   not mkassign_conj(R,A,C1), 
+   cnstvar(R,Predid,N,A,Nt).
+
+% Finally copy to mkassign
+%mkassign(R,A,C) :- 
+%        need_var_bindings(R), 
+%  	mkassign_var(R,A,C).
+
+%mkassign(R,A,C) :- 
+%        not need_var_bindings(R), 
+%  	mkassign_conj(R,A,C).
+
+:- 
+   not exists_mkassign_var,
+   not exists_mkassign_conj. 
+
+mkassign(R,A,C) :- 
+   exists_mkassign_var,
+   not exists_mkassign_conj,
+   mkassign_var(R,A,C).
+
+mkassign(R,A,C) :- 
+   not exists_mkassign_var,
+   exists_mkassign_conj,
+   mkassign_conj(R,A,C).
+
+mkassign(R,A,C) :- 
+   exists_mkassign_var,
+   exists_mkassign_conj,
+   mkassign_var(R,A,C), 
+   mkassign_conj(R,A,C).
+
+:- denyconflicting(R). 
+denyconflicting(R) :- 
+   exists_mkassign_var,
+   exists_mkassign_conj,
+   C1 != C2,
+   mkassign_var(R,A,C1), 
+   mkassign_conj(R,A,C2).
+
+
+
+
+exists_mkassign_var :- mkassign_var(R,A,C).
+exists_mkassign_conj :- mkassign_conj(R,A,C).
+
 
 % Get the variables which have been assigned by xpand
 boundxpand(Rid,Vn,Predid,Jpredid,Tlist) :- 
@@ -470,7 +480,9 @@ boundexpandvv(Rid,Pn,Vn,Val,Predid,Tlist,Jpredid) :-
    cnst(Cid,Val).
 
 % Cannot be that expanded predicate is of different name 
-:- xpand(Rid,Predid,Jpredid,Tlist,N),
+:- notsamename(Rid). % YYY
+notsamename(Rid) :- 
+   xpand(Rid,Predid,Jpredid,Tlist,N),
    pred(Predid,Pn1),
    pred(Jpredid,Pn2),
    Pn1 != Pn2.
