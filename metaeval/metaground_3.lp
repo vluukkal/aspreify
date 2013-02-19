@@ -122,7 +122,7 @@ missedpotential(Rid) :-
     rulepred(Aid,Jpredid). 
 
 % Can't be that there is missedpotential and unmapped predicates
-% THis forces us to generate mapped()'s (hence sbind's). 
+% This forces us to generate mapped()'s (hence sbind's). 
 :- 
     missedpotential(Rid), 
     rulepred(Rid,Predid), 
@@ -517,11 +517,11 @@ notsamename(Rid) :-
    pred(Jpredid,Pn2),
    Pn1 != Pn2.
 
-% #hide.
+#hide.
 #show mkassign/3.
 #show boundexpandvv/7.
 
 % debug
-#show mapped/1.
-#show unmapped/1. 
-#show qualpred/1.
+%#show mapped/1.
+%#show unmapped/1. 
+%#show qualpred/1.
