@@ -52,6 +52,8 @@ import qualified Data.Text.Encoding as E
 import qualified Data.Text.Encoding.Error as Err
 import qualified Data.ByteString as B
 
+import qualified Control.Exception as Ex
+
 import System.Console.GetOpt
 import System.Exit
 import System.Environment
@@ -115,8 +117,8 @@ tossls fn1 fn2 fn3 =
       let prefix = "ssls $Revision: 1.12 $\nb---\n"
       let lineprefix = "1:a: i "
       let postfix = "2:a: update\ne---\n"
+      -- err <- Ex.try((parsenrendernwrite fn1 fn2 rdfrender))::IO (Either e ())
       parsenrendernwrite fn1 fn2 rdfrender
-      -- parsenrendernwrite fn1 fn2 (rdfrulerender fn1) -- 9.11.2011
 
       -- Now read in the text and construct the 
       -- the ssls string. 
@@ -167,7 +169,7 @@ flags =
    ,Option ['g'] []       (NoArg Ground)
         "Reads in a reified set of facts along with variable assignments and performs related grounding."
    ,Option ['b'] []       (ReqArg Base "BASE") -- (NoArg Ground)
-        "Reads in a reified set of facts along with variable assignments and performs related grounding."
+        "Reads in a reified set of facts from value of -b and variable assignments from following files and performs groundings."
    ,Option []    ["help"] (NoArg Help)
         "Print this help message"
    ]
@@ -199,30 +201,24 @@ handleafile otype other baserules basehs f =
        let outfile = (f ++ ".ssls") 
        -- putStrLn ("tossls " ++ show(f) ++ " " ++ show(tmpfname) ++ " " ++ show(outfile))
        tossls f tmpfname outfile 
-       -- return ""
  [Test] -> do
        let loopbackfile = (f ++ ".lp") 
        -- putStrLn ("backtolp " ++ show(f) ++ " " ++ show(loopbackfile))
        backtolp f loopbackfile
-       -- return ""
  [Dereify] -> do 
       let dereifiedfile = (f ++ ".dereified") 
       undoreify f dereifiedfile False
-      -- return ""
  [Ground] -> do 
       let dereifiedfile = (f ++ ".ground") 
       undoreify f dereifiedfile True
-      -- return ""
  [Base s] -> do 
       let dereifiedfile = (f ++ ".ground") 
       undoreify' f dereifiedfile baserules basehs
-      -- return ""
  _ -> do -- default is [Lparse]
       let reifiedfile = (f ++ ".reified") 
       -- putStrLn ("reify " ++ show(f) ++ " " ++ show(reifiedfile))
       let mkid = (List.elem Idreuse other)
       reify f reifiedfile mkid
-      -- return ""
 
 -- handleafile' :: [Flag] -> [Flag] -> (Bool, IO [t], t1) -> [Char] -> IO (t, t1)
 -- There's an emptyset in 2nd elemnt of the triple, but as it is a 
@@ -339,9 +335,12 @@ dobase i  =
                   return (rls,hs)
        otherwise -> return ([],(DeReify.emptyIntermediate True))
 
+-- No longer existing 
 -- debugbase "/Users/vluukkal/src/aspreify/metaeval/hamilton/01212013_100859/output/tlist.lp.reified" "/Users/vluukkal/src/aspreify/metaeval/hamilton/01212013_100859/output/smres1.lp" 
 
 -- debugbase "/Users/vluukkal/src/aspreify/metaeval/hamilton/01232013_225648/output/tlist.lp.reified" "/Users/vluukkal/src/aspreify/metaeval/hamilton/01232013_225648/output/smres1.lp" 
+
+-- debugbase "/Users/vluukkal/src/aspreify/metaeval/hamilton/02052013_234733/output/uncle.lp.reified" "/Users/vluukkal/src/aspreify/metaeval/hamilton/02052013_234733/output/smres1.lp" 
 
 -- dereifywithbase = parsenrendernwrite fn1 fn2 (dereifywithbase baserls basehs)
 debugbase basefile cfile = 
@@ -369,7 +368,7 @@ main =
       else do 
               -- System.IO.hPutStrLn stderr ("main: " ++ show(outputtype) ++ " : " ++ show(other) ++ " : " ++ show(files))
               (baserules,basehs) <- dobase outputtype
-              mapM_ (handleafile outputtype other baserules basehs) files 
+              mapM_ (handleafile outputtype other baserules basehs) files
               exitWith ExitSuccess
        {-- --}
        {--

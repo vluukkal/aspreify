@@ -123,7 +123,8 @@ assigntohash hs nm bdy neg =
       "hasrule" -> let src = getarg bdy 0 in 
                    let trgt = getarg bdy 1 in 
                    let tmphs = hasrulesh hs in 
-                   let newhs = M.insertWith (++) src [trgt] tmphs in
+                   -- let newhs = M.insertWith (++) src [trgt] tmphs in
+                   let newhs = M.insertWith updlst src [trgt] tmphs in
                        hs { hasrulesh = newhs }
       {--
       "rule" ->  let src = getarg bdy 0 in 
@@ -138,12 +139,16 @@ assigntohash hs nm bdy neg =
       "head" -> let src = getarg bdy 0 in 
                 let trgt = getarg bdy 1 in 
                 let tmphs = headsh hs in 
-                let newhs = M.insertWith (++) src [trgt] tmphs in
+                -- let newhs = M.insertWith (++) src [trgt] tmphs in
+                let newhs = M.insertWith updlst src [trgt] tmphs in
                        hs { headsh = newhs }
       "qual" -> let src = getarg bdy 0 in 
                 let trgt = getarg bdy 1 in 
                 let tmphs = quals hs in 
+                {--
                 let newhs = M.insertWith (++) src trgt tmphs in
+                --}
+                let newhs = M.insert src trgt tmphs in 
                        hs { quals = newhs }
       "bexpr" -> let src = getarg bdy 0 in 
                  let trgt = getarg bdy 1 in 
@@ -172,7 +177,8 @@ assigntohash hs nm bdy neg =
       "body" -> let src = getarg bdy 0 in 
                 let trgt = getarg bdy 1 in 
                 let tmphs = bodysh hs in 
-                let newhs = M.insertWith (++) src [trgt] tmphs in
+                -- let newhs = M.insertWith (++) src [trgt] tmphs in
+                let newhs = M.insertWith updlst src [trgt] tmphs in
                        hs { bodysh = newhs }
       "pos" ->  let src = getarg bdy 0 in 
                 let tmphs = posh hs in 
@@ -212,7 +218,8 @@ assigntohash hs nm bdy neg =
                   let idx = getarg bdy 1 in 
                   let trgt = getarg bdy 2 in 
                   let tmphs = alisth hs in 
-                  let newhs = M.insertWith (++) src [(idx,trgt)] tmphs in
+                  -- let newhs = M.insertWith (++) src [(idx,trgt)] tmphs in
+                  let newhs = M.insertWith updlst src [(idx,trgt)] tmphs in
                        hs { alisth = newhs }
       "mkassign" ->  let rn = getarg bdy 0 in 
                   let varn = getarg bdy 1 in 
@@ -299,7 +306,8 @@ assigntohash hs nm bdy neg =
                   let idx = getarg bdy 1 in 
                   let trgt = getarg bdy 2 in 
                   let tmphs = tlisth hs in 
-                  let newhs = M.insertWith (++) src [(idx,trgt)] tmphs in
+                  -- let newhs = M.insertWith (++) src [(idx,trgt)] tmphs in
+                  let newhs = M.insertWith updlst src [(idx,trgt)] tmphs in
                        hs { tlisth = newhs }
       otherwise -> let tmphs = emptyh hs in 
                    let newhs = M.insert nm [""] tmphs in
@@ -310,6 +318,8 @@ assigntohash hs nm bdy neg =
                  let tmphs = typeh hs in 
                  let newhs = M.insert src val tmphs in
                         hs { typeh = newhs }
+
+            updlst newh oldh = if L.elem (L.head newh) oldh then oldh else newh++oldh
 
 handlehead :: IntermediateR -> Body -> IntermediateR
 handlehead hs hd  = 
@@ -341,13 +351,16 @@ pull i handleall =
   -- if M.member i (typeh i)
   let rls = hasrulesh i in 
   -- let y = M.foldWithKey (citem i) [] rls in 
-  let y = M.foldWithKey (crulebase handleall i) [] rls in 
-       -- y <- M.foldWithKey (crule i) (Just []) rls 
-       y
-       -- (Fact y)
+  -- let y = M.foldWithKey (crulebase handleall i) [] rls in 
+  let y = M.foldrWithKey (crulebase handleall i) [] rls in 
+       -- (RComment ("The internals: " ++ show(rls) )):y
+       y 
+
 
 crulebase handleall hash key v accu = 
-    L.foldr (citem handleall hash) [] v 
+    (L.foldr (citem handleall hash) [] v)
+    -- (RComment ("crulebase handling: " ++ show(key) ++ " : " ++ show(v) )):(L.foldr (citem handleall hash) [] v)
+
 
 getrulevars h k = 
    let vars = M.lookup k (mkassigns h) in 
@@ -385,19 +398,20 @@ citem handleall hash key accu =
    let tp = M.lookup key (typeh hash') in 
    let cmnt = (RComment ("Source key: " ++ show(key) )) in
    case tp of 
-      Just "rule" -> checkground hash' (crule hash' key (cmnt:accu)) accu 
-      Just "constraint" -> checkground hash' (cconstraint hash' key (cmnt:accu)) accu 
+      Just "rule" -> checkground key hash' (crule hash' key (cmnt:accu)) accu 
+      Just "constraint" -> checkground key hash' (cconstraint hash' key (cmnt:accu)) accu 
       Just "assert" -> if handleall then (cassert hash' key (cmnt:accu)) else accu 
       -- Just "composite" -> cassert hash key accu 
       Just x -> (Deny [Plain (Const ("Error at citem: unknown item: "++ x )) [] True]):accu 
       Nothing -> -- accu 
               (Deny [Plain (Const ("Error at citem: unknown ID: "++key )) [] True]):accu 
    where 
-      checkground h func accu = 
+      checkground id h func accu = 
         if (M.null (rassigns h)) && (doground h) 
-        then (RComment ("Not grounding: " ++ show(key) ++ " -- " ++ (show h))):accu 
+        -- then (RComment ("Not grounding: " ++ show(key) ++ " -- " ++ (show h))):accu 
+        then accu 
         -- else (RComment ("Vars: " ++ (rendervars h))):func
-        else func ++ [(RComment ("Vars: " ++ (rendervars h)))]
+        else func ++ [(RComment ("Vars for " ++ show(id) ++ " : " ++ (rendervars h)))]
                    
 rendervars h = 
   let boundvars = (rassigns h) in 
@@ -437,13 +451,6 @@ cconstraint hash key accu =
                ((Deny bdls):accu)
         Nothing -> ((RComment ("cconstraint no key " ++ show(key))):accu)
 
-cconstraint' hash key accu = 
-   -- Unsafe, will raise exception if no such key, aka
-   -- incomplete refied file ...
-   let bdks = (bodysh hash) M.! key in 
-   let bdls = L.foldr (cbody hash) [] bdks in 
-       ((Deny bdls):accu)
-
 cassert hash key accu = 
    let hdkm = M.lookup key (headsh hash) in 
    case hdkm of 
@@ -451,15 +458,6 @@ cassert hash key accu =
            let hdc = chead hash (L.head hdk) in 
                ((Fact [hdc]):accu)
         Nothing -> ((RComment ("cassert no key " ++ show(key))):accu)
-
-cassert' hash key accu = 
-   -- Unsafe, will raise exception if no such key, aka
-   -- incomplete refied file ...
-   let hdk = (headsh hash) M.! key in 
-   let hdc = chead hash (L.head hdk) in 
-       ((Fact [hdc]):accu)
-       -- (hdc:accu)
-
 
 cbexpr :: IntermediateR -> String -> [Body] -> [Body]
 cbexpr hash key accu = 
@@ -472,17 +470,6 @@ cbexpr hash key accu =
               let rgt' = cexpr hash rgt in 
                   ((BExpr (tobop (rmquot bop)) lft' rgt'):accu)
         (_,_,_) -> ((Comment ("cbexpr, no key " ++ show(key))):accu)
-       -- ((Rule hdc bdls):accu)
-
--- With no err check 
-cbexpr' :: IntermediateR -> String -> [Body] -> [Body]
-cbexpr' hash key accu = 
-   let lft = (largh hash) M.! key in 
-   let rgt = (rargh hash) M.! key in 
-   let bop = (boph hash) M.! key in 
-   let lft' = cexpr hash lft in 
-   let rgt' = cexpr hash rgt in 
-       ((BExpr (tobop (rmquot bop)) lft' rgt'):accu)
        -- ((Rule hdc bdls):accu)
 
 
@@ -519,7 +506,8 @@ cbody hash key accu =
           let tp = M.lookup key (typeh hash) in 
            case tp of 
                 Just "bexpr" -> cbexpr hash key accu 
-                Just "pred" -> (cpred hash key):accu 
+                -- Just "pred" -> (Comment ("actualbody with key " ++ show(key) ++ " and hash " ++ show(hash))):((cpred hash key):accu)
+                Just "pred" -> ((cpred hash key):accu)
                 Just "composite" -> (ctlist hash key) ++ accu -- let nxt = ( hash) M.! key 
                 Nothing -> -- accu 
                         (Plain (Const ("Error at cbody: unknown ID: "++key )) [] True):accu        
@@ -679,6 +667,7 @@ cpred h k =
              -- let oargs'' = L.map (cexpr h) oargs' in     
              let ispos = (M.member k (negh h)) in -- && (not (M.member k (posh h) )) in 
              (Plain (Const (rmquot (L.head pn))) oargs' (not ispos))
+             -- (Comment ("cpred for key: " ++ show(k) ++ " args:" ++ show(args) ++ " args':" ++ show(args') ++ " oargs:" ++ show(oargs) ++ " oargs':" ++ show(oargs')  ))
          (_,_) -> (Comment ("cpred: no key " ++ show(k) ))
     where 
       myc (i1,v1) (i2,v2) = i1 `compare` i2
