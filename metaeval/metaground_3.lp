@@ -5,8 +5,12 @@
 % Assume that foo.lp contains the program.
 % 1. Reify the program: ./aspreify foo.lp 
 % 2. Combine this with the reified program: cat metaground.lp foo.lp.reified > toeval.lp
-% 3. Calculate the answer sets: gringo toval.lp | clasp --project -n 0 
-%    
+% 3. Calculate the answer sets: gringo toeval.lp | clasp --project -n 0 
+% 4. For full grounding pipeline do:
+% 4.1 gringo toval.lp | clasp --project -n 0 | python smodelsres.py
+% 4.2 ./aspreify -b foo.lp.reified smres*.lp
+% 4.3 for f in *.ground; do cat $f >> foo.lp.reified.res; done 
+%   
 
 % Separate postive facts from others
 nonfact(R) :- rule(R), body(R,A).

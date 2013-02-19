@@ -15,9 +15,10 @@ well as the rules themselves, which is important in distributed
 reasoning.
 
 An evaluator in ASP, a metaevaluator, allows specifying the semantics 
-within the same ASP framework. 
+of the ASP evaluation within the same ASP framework. 
 An ASP metaevaluator for reified variable free ASP programs is provided,
-the variabled case is under construction, but emerging. 
+the variabled case is under construction, but emerging, starting with a
+metagrounder supporting variables.  
 
 For more elaboration: 
 @inproceedings{DBLP:conf/rr/JanhunenL12,
@@ -27,7 +28,7 @@ For more elaboration:
   booktitle = {RR},
   year      = {2012},
   pages     = {106-121},
-  ee        = {http://dx.doi.org/10.1007/978-3-642-33203-6_9},
+  ee        = {http://dx.doi.org/10.1007/978-3-642-33203-6_9}
 }
 
 Vesa Luukkala (vesa.luukkala@gmail.com), 29.11.2012 
@@ -44,7 +45,13 @@ Obtain the sources initially:
 Update later on after initially fetching them: 
 > git remote update
 
-Some simple tests:
+To run whole metagrounding chain:
+
+> ./ground.sh tests/ground_input/uncle3.lp 
+produces uncle3.lp.reified.res
+
+Some simple examples highlighting particular features of aspreify:
+
 > ./aspreify tests/hamiltonian_cycle.lp
 produces tests/hamiltonian_cycle.lp.reified 
 
@@ -105,6 +112,10 @@ constructs:
 Compile the parser test suite and run it:
 > ghc -o runparsertests testaspparse.hs aspparse.hs 
 > ./runparsertests 
+
+Run the grounding tests:
+> cd tests
+> for i in ground_input/*; do ./rungroundtest.sh $i; done 
 
 4. Use cases 
 
