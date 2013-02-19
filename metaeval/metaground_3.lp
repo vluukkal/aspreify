@@ -5,7 +5,7 @@
 % Assume that foo.lp contains the program.
 % 1. Reify the program: ./aspreify foo.lp 
 % 2. Combine this with the reified program: cat metaground.lp foo.lp.reified > toeval.lp
-% 3. Calculate the answer sets: smodels toval.lp | smodels 0 
+% 3. Calculate the answer sets: gringo toval.lp | clasp --project -n 0 
 %    
 
 % Separate postive facts from others
