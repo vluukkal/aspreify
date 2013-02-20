@@ -407,11 +407,25 @@ citem handleall hash key accu =
               (Deny [Plain (Const ("Error at citem: unknown ID: "++key )) [] True]):accu 
    where 
       checkground id h func accu = 
-        if (M.null (rassigns h)) && (doground h) 
+        -- if (M.null (rassigns h)) && (doground h) 
+        if (nullorbogus h) && (doground h) 
         -- then (RComment ("Not grounding: " ++ show(key) ++ " -- " ++ (show h))):accu 
+        -- then (RComment ("Not grounding: " ++ show(key) ++ " -- " ++ show(doground h))):accu 
         then accu 
         -- else (RComment ("Vars: " ++ (rendervars h))):func
-        else func ++ [(RComment ("Vars for " ++ show(id) ++ " : " ++ (rendervars h)))]
+        -- else func ++ [(RComment ("Vars for " ++ show(id) ++ " : " ++ (rendervars h) ++ " - dg:" ++ show((doground h))  ))]
+        else func ++ [(RComment ("Vars for " ++ show(id) ++ " : " ++ (rendervars h) ))]
+      nullorbogus h = 
+        let r = (rassigns h) in 
+        if (M.null r) then True 
+        else
+            -- Check for a single variable "edge" with value "bogusmarker"
+            if ((M.size r) /= 1) then False
+            else 
+                let a = M.lookup "\"edge\"" r in 
+                case a of 
+                  Just "bogusmarker" -> True 
+                  _ -> False
                    
 rendervars h = 
   let boundvars = (rassigns h) in 
@@ -545,7 +559,8 @@ ctlist'' h k =
       -- The rest of them contain the templates by which the template
       -- needs to be instantiated.  
       let rest = L.tail oargs in 
-        (instantiatectlist h k tmplt rest) ++ [(Comment ("ctlist for " ++ show(k) ++ " with initial " ++ show(tmplt)) )]
+        -- (instantiatectlist h k tmplt rest) ++ [(Comment ("ctlist for " ++ show(k) ++ " with initial " ++ show(tmplt)) )]
+        (instantiatectlist h k tmplt rest)
     where 
       myc (i1,v1) (i2,v2) = i1 `compare` i2
 
