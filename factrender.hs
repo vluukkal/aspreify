@@ -177,12 +177,14 @@ factbody rel ruleid parentid ctr r accu =
                         in 
                         -- let embed = (myrand())::Int in 
                          let embed = FactRender.getnext(ctr) in 
+                         let arity = show(List.length a) in 
                         accu ++ 
                         [
                           (if nonneg then ("pos(" ++ show(factid) ++ ").\n")
                            else ("neg(" ++ show(factid) ++ ").\n")) ++ 
                           myrel ++ "(" ++ show(parentid) ++ "," ++ show(factid) ++ ")." ++ "\n" ++
                           "rulepred(" ++ show(parentid) ++ "," ++ show(factid) ++ ")." ++ "\n" ++ 
+                          "arity(" ++ show(factid) ++ "," ++ arity ++ ")." ++ "\n" ++ 
                           "pred(" ++ show(factid) ++ "," ++ show(unatom(n)) ++ ")." ++ "\n" ++
                           --- "fact" ++ show(factid) ++ ",http://m3.org/rls#name," ++ 
                           --- show(unatom(n)) ++ "\n" ++ 
