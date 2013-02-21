@@ -89,7 +89,7 @@ qualpred(Predid) :-
 % variables which are outside of the typed list.  
 
 % :- notunmapped(Rid).  % YYY
-notunmapped(Rid) :- 
+%notunmapped(Rid) :- 
    % need_var_bindings(Rid), 
    % need_conj_bindings(Rid), 
 
@@ -97,13 +97,13 @@ notunmapped(Rid) :-
    % This does not sound right, a conjunctive would leave
    % stuff not fully generated
    % not exists_mkassign_conj, 
-   mapped(PredidX),  % there cannot be a unmapped without a mapped 
+%   mapped(PredidX),  % there cannot be a unmapped without a mapped 
                      % but if there is no mapped then this wont work 
-   unmapped(Predid), % This is want we want, but now we try to make it less global
+%   unmapped(Predid), % This is want we want, but now we try to make it less global
    % All of below states that we should not count predicates inside conjunction 
    % to this constraint. 
-   rulepred(Rid,Predid), 
-   not qualpred(Predid). 
+%   rulepred(Rid,Predid), 
+%   not qualpred(Predid). 
 
 % There is a potential variable binding in the rule Rid
 % This is just potential, this may be problematic when 
@@ -163,7 +163,7 @@ boundvv(Rid,Vn,Val,Predid,Jpredid) :-
 
 mkassign_var(R,A,C) :- boundvv(R,A,C,Predid,Jpredid).
 
-boundvn(Vn) :- boundv(Rid,Vn,Preid,Jpredid).
+boundvn(Rid,Vn) :- boundv(Rid,Vn,Preid,Jpredid).
 
 % There cannot be a variable name, which does not have 
 % a bound. 
@@ -292,7 +292,7 @@ constraintpred(Predid1) :-
 
 % We only know if there is a variable, but 
 % we should associate the variable to a predicate 
-% directly, to avoid making an unpredicateble 
+% directly, to avoid making an unpredicatable 
 % search in case of nested expressions. 
 % Here we assume no nesting but variables direct under alist. 
 % We also limit this to a rule where there are conjunction lists. 
@@ -312,9 +312,10 @@ constrainedxpand(Rid,Predid,N,Tlist,Jpredid,Nt) :-
 % Is there a variable that has not been constrained
 :- dangling(Rid,Vn).
 dangling(Rid,Vn) :- 
+    ground(Rid),
     constrainedvar(Rid,Vn), 
-    not boundvn(Vn),
-    not boundconjvn(Vn).
+    not boundvn(Rid,Vn),
+    not boundconjvn(Rid,Vn).
 
 % List the places where constrainedvar is being referred to inside the tlist
 cnstvar(Rid,Predid,N,Vn,Nt) :-
@@ -435,7 +436,7 @@ mkassign_conj(Rid,Vn,Val) :-
     boundexpandvv(Rid,Pn,Vn,Val,Predid1,Tlist,Jpredid),
     cnstvar(Rid,Predid2,N,Vn,Nt).
 
-boundconjvn(Vn) :- 
+boundconjvn(Rid,Vn) :- 
     boundexpandvv(Rid,Pn,Vn,Val,Predid1,Tlist,Jpredid).
 
 % Cannot be that we bind to variable with different values
@@ -509,13 +510,6 @@ mkassign(R,A,C) :-
    mkassign_var(R,A,C), 
    mkassign_conj(R,A,C).
 
-%mkassign(R,A,C1) :- 
-%   denyconflicting(R,A), 
-%   exists_mkassign_var,
-%   exists_mkassign_conj,
-%   mkassign_var(R,A,C1), 
-%   mkassign_conj(R,A,C2).
-
 :- denyconflicting(R,A). 
 denyconflicting(R,A) :- 
    exists_mkassign_var,
@@ -563,7 +557,7 @@ notsamename(Rid) :-
 %#show mapped/1.
 %#show unmapped/1. 
 %#show qualpred/1.
-#show ground/1. 
-#show nonfact/1.
-#show fact/1.
-#show other/1. 
+%#show ground/1. 
+%#show nonfact/1.
+%#show fact/1.
+%#show other/1. 
