@@ -39,6 +39,10 @@ other(R1) :- ground(R2), nonfact(R1), nonfact(R2), R1 != R2.
 % Generate all possible bindings
 {sbindit(Rid,Predid,Jpredid) : rulepred(Rid,Predid) : assert(Aid) : rulepred(Aid,Jpredid)} :- ground(Rid). 
 
+% A projection needed for later to force creation 
+% of sbindit's. 
+hasbind(Rid) :- sbindit(Rid,Predid,Jpredid). 
+
 % Debugging with naming, not needed
 vsbindit(Prednm,Predid,Jpredid) :- sbindit(Rid,Predid,Jpredid), pred(Predid,Prednm).
 
@@ -83,15 +87,14 @@ qualpred(Predid) :-
 % Actually, we may want to say that, we deny this 
 % for rules that have been grounded and have 
 % variables which are outside of the typed list.  
-% eight(Rid) :- 
 
-:- notunmapped(Rid).  % YYY
+% :- notunmapped(Rid).  % YYY
 notunmapped(Rid) :- 
    % need_var_bindings(Rid), 
-   % not need_conj_bindings(Rid), 
+   % need_conj_bindings(Rid), 
 
    % If there is a conjunction then not all are needed
-   % Ths does not sound right, a conjunctive would leave
+   % This does not sound right, a conjunctive would leave
    % stuff not fully generated
    % not exists_mkassign_conj, 
    mapped(PredidX),  % there cannot be a unmapped without a mapped 
@@ -116,9 +119,19 @@ potbinding(Rid) :-
     rulepred(Aid,Jpredid), 
     pred(Jpredid,Pn). 
 
+:- forcesbind(Rid).
+forcesbind(Rid) :- 
+   potbinding(Rid),
+   not hasbind(Rid). 
+
 % Now we want to say that it cant be that there is a potential 
 % binding and there is no sbindit for it. 
+% This may be useless as it is present in 
+% otherwise OK answer sets. XXX
+% 
+% :- missedpotential(Rid). % YYY 
 missedpotential(Rid) :- 
+    not need_conj_bindings(Rid), 
     potbinding(Rid), 
     not sbindit(Rid,Predid,Jpredid), 
     rulepred(Rid,Predid), 
@@ -127,7 +140,9 @@ missedpotential(Rid) :-
 
 % Can't be that there is missedpotential and unmapped predicates
 % This forces us to generate mapped()'s (hence sbind's). 
-:- 
+
+% :- unsafeunmapped(Rid,Predid). % YYY 
+unsafeunmapped(Rid,Predid) :- 
     missedpotential(Rid), 
     rulepred(Rid,Predid), 
     unmapped(Predid).
@@ -195,6 +210,7 @@ qualvarn(Rid,Vid,Vn) :-
   
 % Now collect the items for variables of the same name 
 
+% A rulevar that is not inside a conjunction 
 nonqualvar(Rid,Vid,Vn) :- 
   rulevar(Rid,Vid),
   var(Vid,Vn), 
@@ -279,7 +295,7 @@ constraintpred(Predid1) :-
 % directly, to avoid making an unpredicateble 
 % search in case of nested expressions. 
 % Here we assume no nesting but variables direct under alist. 
-% We also limit this to a rule where there are cinjunction lists. 
+% We also limit this to a rule where there are conjunction lists. 
 constrainedvar(Rid,Vn) :- 
     constraintpred(Predid), 
     rulepred(Rid,Predid), 
@@ -288,9 +304,17 @@ constrainedvar(Rid,Vn) :-
     
 % Now we need to detect those xpands, which refer to this 
 % constrainedvar 
+% XXX Perhaps use this with boundv as well 
 constrainedxpand(Rid,Predid,N,Tlist,Jpredid,Nt) :- 
     constrainedvar(Rid,Vn), 
     xpandnv(Rid,Pn,Vn,Val,N,Predid,Tlist,Jpredid,Nt). 
+
+% Is there a variable that has not been constrained
+:- dangling(Rid,Vn).
+dangling(Rid,Vn) :- 
+    constrainedvar(Rid,Vn), 
+    not boundvn(Vn),
+    not boundconjvn(Vn).
 
 % List the places where constrainedvar is being referred to inside the tlist
 cnstvar(Rid,Predid,N,Vn,Nt) :-
@@ -411,6 +435,9 @@ mkassign_conj(Rid,Vn,Val) :-
     boundexpandvv(Rid,Pn,Vn,Val,Predid1,Tlist,Jpredid),
     cnstvar(Rid,Predid2,N,Vn,Nt).
 
+boundconjvn(Vn) :- 
+    boundexpandvv(Rid,Pn,Vn,Val,Predid1,Tlist,Jpredid).
+
 % Cannot be that we bind to variable with different values
 :- nodiffconjass(Rid).  % YYY
 nodiffconjass(Rid) :- 
@@ -482,8 +509,15 @@ mkassign(R,A,C) :-
    mkassign_var(R,A,C), 
    mkassign_conj(R,A,C).
 
-:- denyconflicting(R). 
-denyconflicting(R) :- 
+%mkassign(R,A,C1) :- 
+%   denyconflicting(R,A), 
+%   exists_mkassign_var,
+%   exists_mkassign_conj,
+%   mkassign_var(R,A,C1), 
+%   mkassign_conj(R,A,C2).
+
+:- denyconflicting(R,A). 
+denyconflicting(R,A) :- 
    exists_mkassign_var,
    exists_mkassign_conj,
    C1 != C2,
@@ -529,3 +563,7 @@ notsamename(Rid) :-
 %#show mapped/1.
 %#show unmapped/1. 
 %#show qualpred/1.
+#show ground/1. 
+#show nonfact/1.
+#show fact/1.
+#show other/1. 
