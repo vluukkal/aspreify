@@ -50,14 +50,19 @@ for f in *.ground; do echo "% $f" >> $ifile.res; cat $f >> $ifile.res; done
 # If they diff, we'd stop with set -e 
 set +e
 r1=`diff -q $ifile.res ../../ref_ground_output/$ifile.res`
+`sort $ifile.res > $ifile.res.srt`
+`sort ../../ref_ground_output/$ifile.res > $ifile.res.ref.srt`
+r2=`diff -q $ifile.res.srt $ifile.res.ref.srt`
 set -e
 
 # r2=`diff -s $ifile.res ../../ref_ground_output/$ifile.res`
 
-if [ -n "$r1" ]; then 
+if [ -n "$r2" ]; then 
   # It is an error 
   echo
-  echo "FAIL $reified_src, files in $dname/output"
+  echo >&2 "FAIL $reified_src, files in $dname/output"
+  echo >&2 "diff $dname/output/$ifile.res ref_ground_output/$ifile.res"
+  echo >&2 "diff $dname/output/$ifile.res.srt $dname/output/$ifile.res.ref.srt"
   echo 
   #exit 1
 else
@@ -65,7 +70,11 @@ else
   cd ../..
   rm -fr $dname 
   echo
-  echo "PASS $reified_src"
+  if [ -n "$r1" ]; then 
+      echo "PASS $reified_src (order differs)"
+  else
+      echo "PASS $reified_src"
+  fi
   echo 
   #exit 0
 fi
