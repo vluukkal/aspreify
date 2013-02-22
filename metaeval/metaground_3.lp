@@ -74,6 +74,45 @@ unmapped(Predid1) :-
   not head(Rid,Predid1),
   rulepred(Rid,Predid1). 
 
+% This should eventually be in the reified result
+% now we may miss deeper relations. 
+% We could have the name Vn here as well. 
+predvar(Predid,Vid) :- 
+    alist(Predid,N,Vid),
+    var(Vid,Vn). 
+
+predvarext(Predid,Vid,Vn,N) :- 
+    alist(Predid,N,Vid),
+    var(Vid,Vn). 
+
+
+% For unmapped predicates, check their compatibility with the current mapping 
+potcflct(Predid1,Pn1,Vn,Val,Jpredid2) :- 
+  unmapped(Predid1),                    % An unmapped predicate
+  pred(Predid1,Pn1),                    % named Pn1
+  % predvarexp(Predid1,Vid,Vn,N),         % referring to a variable  % Does not seem to work 
+  predvar(Predid1,Vid), 		% referring to a variable 
+  var(Vid,Vn),                          % named Vn
+  vsbindit(Pn2,Predid2,Jpredid2),	% A current mapping 
+  boundvv(Rid,Vn,Val,Predid2,Jpredid2), % for a predicate named Pn2, for the same variable
+  Pn1 != Pn2.
+
+predval(Aid,Pn,N,Val) :- 
+  assert(Aid), 
+  head(Aid,Predid), 
+  pred(Predid,Pn),
+  alist(Predid,N,Cid), 
+  cnst(Cid,Val). 
+
+% If there is a potential conflict, check and flag it 
+:- realcflct(Pn1,Vn,Predid1,N, Val1, Val2). 
+realcflct(Pn1,Vn,Predid1,N, Val1, Val2) :- 
+  potcflct(Predid1,Pn1,Vn,Val1,Jpredid1), 
+  predvarext(Predid1,Vid,Vn,N),
+  % Now find a domain predicate with a proper name 
+  predval(Aid,Pn1,N,Val2), 
+  Val1 != Val2.
+
 % Distinguish predicates which are bound by a conjunction 
 qualpred(Predid) :- 
   % rulepred(Rid,Predid), 
@@ -215,6 +254,11 @@ nonqualvar(Rid,Vid,Vn) :-
   rulevar(Rid,Vid),
   var(Vid,Vn), 
   not qualvar(Rid,Vid).
+
+% unmapped()
+
+% Now try to see if the current mkassigns fit with 
+
 
 % Next generate all possible conjunctive groundings; that is
 % associate the groundings to the typed relation. 
@@ -361,16 +405,6 @@ notextecflct(Rid) :-
    J1 != J2, 
    extcflct(Rid,Vn,J1,J2). 
 
-% Does not seem to work, why 
-%selected(J2) :-
-%selected2(J2) :-
-%   selected(J1),
-%   sameval(Rid,J1,J2,N).
-
-% Make sure that no relevant Justified predid 
-% is left out. 
-
-
 % Make sure that no justification with a compatible 
 % valuation is left out. 
 % A global constraint, caveat emptor... 
@@ -383,9 +417,6 @@ notleftout(Rid) :-
    J1 != J2, 
    cnstvar(Rid,Predid,N,Vn,Nt),
    sameval(Rid,J1,J2,N).
-
-% Again, a global which is not good. 
-% :- missingjust(J1,J2).
 
 % Cannot be that there is a justification with the same name 
 % but it is not covered by xpand. 
@@ -457,11 +488,9 @@ need_var_bindings(Rid) :-
     rulepred(Rid,Predid), 
     not qualpred(Predid). 
 
-
 % Now state that both mkassigns must match, here we do not 
 % distinguish between which side is wrong, but since we assume 
 % that _conj is always more general the _var should constrain more 
-% one :- 
 :- notmatching(R). % YYY
 notmatching(R) :- 
    need_conj_bindings(R), 
@@ -471,8 +500,6 @@ notmatching(R) :-
    C1 != C2. 
 
 % We should still say that both must be present. 
-% it seems that _var is more common 
-% But this is the case if there are conjuncted variables. 
 :- notboth(R). % YYY
 notboth(R) :- 
    need_conj_bindings(R), 
@@ -481,19 +508,11 @@ notboth(R) :-
    not mkassign_conj(R,A,C1), 
    cnstvar(R,Predid,N,A,Nt).
 
-% Finally copy to mkassign
-%mkassign(R,A,C) :- 
-%        need_var_bindings(R), 
-%  	mkassign_var(R,A,C).
-
-%mkassign(R,A,C) :- 
-%        not need_var_bindings(R), 
-%  	mkassign_conj(R,A,C).
-
 :- 
    not exists_mkassign_var,
    not exists_mkassign_conj. 
 
+% Finally copy to mkassign
 mkassign(R,A,C) :- 
    exists_mkassign_var,
    not exists_mkassign_conj,
