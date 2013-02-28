@@ -73,7 +73,9 @@ factrender n flag rb  =
             -- let aid = 0 in 
             let ctr = FactRender.unsafectr in 
             let aid = FactRender.getnext(ctr::IO Integer) in 
-              n ++ (List.foldr (factitem aid ctr) "" (reverse r))
+            let txt = (n ++ (List.foldr (factitem aid ctr) "" (reverse r))) in 
+            let maxctr = FactRender.getnext(ctr) in 
+               txt ++ ("freectr(" ++ show(maxctr) ++ ").\n")
 
 txtcomment t = 
   let l = lines t in 
@@ -99,14 +101,19 @@ factitem id ctr i accu =
     let ctext = txtcomment(txtitem i "") in 
     case i of
       Rule b l -> 
+                  let numbodies = show(List.length l) in 
                   accu ++ ctext ++ preflink ++ 
                   "rule(" ++ show(ruleid) ++ ")." ++ "\n" ++
+                  "bodycount(" ++ show(ruleid) ++ "," ++ numbodies ++  ")." ++ "\n" ++
                   -- head(factbody "head" ruleid b []) ++ 
                   head(factbody "" ruleid ruleid ctr b []) ++ 
                   (List.foldr (++) "" (List.foldr (factbody "body" ruleid ruleid ctr) [] l)) 
                  -- "" 
-      Deny l -> accu ++ ctext ++ preflink ++ 
+      Deny l ->
+                let numbodies = show(List.length l) in 
+                 accu ++ ctext ++ preflink ++ 
                 "constraint(" ++ show(ruleid) ++ ")." ++ "\n" ++
+                "bodycount(" ++ show(ruleid) ++ "," ++ numbodies ++  ")." ++ "\n" ++
                 (List.foldr (++) "" (List.foldr (factbody "body" ruleid ruleid ctr) [] l))
                 -- ++ 
                 -- ""
