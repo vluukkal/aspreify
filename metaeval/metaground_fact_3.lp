@@ -37,55 +37,55 @@
 % *Cval    - value of the variable at Jpredid
 %
 % project(Rid,Pn,Vn,Predid,N1,Jpredid,N2) :- 
-project(Rid,Pn,Vn,Predid,N1,Jpredid,N2,Cval) :- 
-    singlebody(Rid), 
-    % Variable in the head 
-    head(Rid,Predid), 
-    pred(Predid,Pn), 
-    alist(Predid,N1,Vid1), 
-    var(Vid1,Vn), 
-    % The variable Vn in the predicate of body
-    body(Rid,Bid), 
-    pred(Bid,Pntmp), 
-    alist(Bid,N2,Vidtmp), 
-    var(Vidtmp,Vn), 
-    % A domain predicate that matches the name of the predicate in body
-    assert(Aid), 
-    head(Aid,Jpredid), 
-    pred(Jpredid,Pntmp),
-    alist(Jpredid,N2,Cid),
-    cnst(Cid,Cval). 
+%project(Rid,Pn,Vn,Predid,N1,Jpredid,N2,Cval) :- 
+%    singlebody(Rid), 
+%    % Variable in the head 
+%    head(Rid,Predid), 
+%    pred(Predid,Pn), 
+%    alist(Predid,N1,Vid1), 
+%    var(Vid1,Vn), 
+%    % The variable Vn in the predicate of body
+%    body(Rid,Bid), 
+%    pred(Bid,Pntmp), 
+%    alist(Bid,N2,Vidtmp), 
+%    var(Vidtmp,Vn), 
+%    % A domain predicate that matches the name of the predicate in body
+%    assert(Aid), 
+%    head(Aid,Jpredid), 
+%    pred(Jpredid,Pntmp),
+%    alist(Jpredid,N2,Cid),
+%    cnst(Cid,Cval). 
 
-project2(Rid,Pn,Vn,Predid,N1,Jpredid,N2,Cval) :- 
-    % singlebody(Rid), 
-    % Variable in the head 
-    head(Rid,Predid), 
-    pred(Predid,Pn), 
-    alist(Predid,N1,Vid1), 
-    var(Vid1,Vn), 
-    % The variable Vn in the predicate of body
-    body(Rid,Bid), 
-    pred(Bid,Pntmp), 
-    alist(Bid,N2,Vidtmp), 
-    var(Vidtmp,Vn), 
-    % A domain predicate that matches the name of the predicate in body
-    assert(Aid), 
-    head(Aid,Jpredid), 
-    pred(Jpredid,Pntmp),
-    alist(Jpredid,N2,Cid),
-    cnst(Cid,Cval). 
+%project2(Rid,Pn,Vn,Predid,N1,Jpredid,N2,Cval) :- 
+%    % singlebody(Rid), 
+%    % Variable in the head 
+%    head(Rid,Predid), 
+%    pred(Predid,Pn), 
+%    alist(Predid,N1,Vid1), 
+%    var(Vid1,Vn), 
+%    % The variable Vn in the predicate of body
+%    body(Rid,Bid), 
+%    pred(Bid,Pntmp), 
+%    alist(Bid,N2,Vidtmp), 
+%    var(Vidtmp,Vn), 
+%    % A domain predicate that matches the name of the predicate in body
+%    assert(Aid), 
+%    head(Aid,Jpredid), 
+%    pred(Jpredid,Pntmp),
+%    alist(Jpredid,N2,Cid),
+%    cnst(Cid,Cval). 
 
-pproject(Rid,Vn) :- project(Rid,Pn,Vn,Predid,N1,Jpredid,N2,Cval). % project(Rid,Pn,Vn,Predid,N1,Jpredid,N2). 
+% pproject(Rid,Vn) :- project(Rid,Pn,Vn,Predid,N1,Jpredid,N2,Cval). % project(Rid,Pn,Vn,Predid,N1,Jpredid,N2). 
 
 
 
 % For a rule, check that all variables have been projected
 % Will this ever happen?
-notprojected(Rid) :- 
-    head(Rid,Predid),
-    alist(Predid,N,Vid),
-    var(Vid,Vn), 
-    not pproject(Rid,Vn).
+%notprojected(Rid) :- 
+%    head(Rid,Predid),
+%    alist(Predid,N,Vid),
+%    var(Vid,Vn), 
+%    not pproject(Rid,Vn).
     
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Generate a mock assertion for trueprule
@@ -101,18 +101,17 @@ notprojected(Rid) :-
 % assert(Rid) :- trueprule(Rid). 
 
 % This seems to have stopped stuff badly 
-% assert(Aid) :- trueprule(Rid), freectr(Aid), not assert(Aid).
-
-
-% The justifying constant id for variable Vn
-%justvarpredid(Rid,Vn,Cid) :- 
-%    boundvv(Rid,Vn,Val,Predid,Jpredid),
-%    alist(Jpredid,N1,Cid),
-%    cnst(Cid,Val). 
+% 4 { cassert(Aid), chead(Aid,Aid+1), cpos(Aid+1), cpred(Aid + 2, Pn ) } 4 :- 
+6 { hasrule(1,Aid), newfact(Aid), assert(Aid), head(Aid,Aid+1), pos(Aid+1), pred(Aid + 1, Pn ) } 6 :- 
+    trueprule(Rid), 
+    head(Rid,Predid), 
+    pred(Predid,Pn),
+    freectr(Aid).
 
 % We generate a balist instead of alist and point it 
 % to the variables assigned. 
-calist(Hpredid,N,Cid) :- 
+% calist(Aid + 2,N1,Cid) :- 
+alist(Aid + 1,N1,Cid) :- 
     trueprule(Rid), 
     boundvv(Rid,Vn,Val,Predid,Jpredid),  % trueprule means that there is only one Jpredid
     alist(Jpredid,N,Cid),               % get the constant ID responsible for this variables
@@ -120,7 +119,24 @@ calist(Hpredid,N,Cid) :-
     head(Rid,Hpredid), 
     Hpredid != Predid,                   % somewhat redundant 
     alist(Hpredid,N1,Varid),               % get the position of variable named Vn
-    var(Varid,Vn). 
+    var(Varid,Vn), 
+    freectr(Aid).
+
+% See if the rules can see them after the generation 
+allmydpreds(Pn,Predid) :- 
+    assert(Aid),
+    head(Aid,Predid),
+    pred(Predid,Pn). 
+
+% Check the sbind consistency 
+newnotbound(Jpredid) :- 
+    assert(Aid),
+    newfact(Aid), 
+    head(Aid,Jpredid),
+    ground(Rid), 
+    body(Rid,Predid),
+    not sbindit(Rid,Predid,Jpredid). 
+
 
 
 %EOF metaground_fact.lp 
