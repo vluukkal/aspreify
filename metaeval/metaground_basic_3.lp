@@ -56,14 +56,10 @@ nodiffjusts(Rid) :-
    sbindit(Rid,Predid,Jpredid2),
    Jpredid1 != Jpredid2.
 
-% Make sure that each predicate in body of a ground rule is 
-% mapped. 
-mapped(Predid) :- sbindit(Rid,Predid,Jpredid). 
-unmapped(Predid1) :- 
-  not mapped(Predid1), 
-  ground(Rid), 
-  not head(Rid,Predid1),
-  rulepred(Rid,Predid1). 
+:- nobindinhead(Rid).
+nobindinhead(Rid) :- 
+   sbindit(Rid,Predid,Jpredid1),
+   head(Rid,Predid).
 
 % Make sure that each predicate in body of a ground rule is 
 % mapped. 
