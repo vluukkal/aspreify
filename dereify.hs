@@ -70,7 +70,9 @@ data IntermediateR = IntermediateR {
      mkassigns  :: (M.Map String (M.Map String String)),
      rassigns  ::  (M.Map String String),
      ptrue     :: (M.Map String String),
+     truerule  :: (M.Map String String),
      pfalse     :: (M.Map String String),
+     newfact     :: (M.Map String String),
      -- xpand     :: (M.Map (String,String) (M.Map String String)),
      -- xpand     :: (M.Map String [(M.Map String String)]),
      xpand     :: (M.Map String (M.Map String (M.Map String String))),
@@ -88,8 +90,8 @@ emptyIntermediate x =
        predsh = M.empty, varsh = M.empty, alisth = M.empty, typeh = M.empty, 
        largh = M.empty, rargh = M.empty, boph = M.empty,tlisth = M.empty, 
        quals = M.empty, composedh = M.empty, mkassigns = M.empty, rassigns = M.empty, 
-       ptrue = M.empty, pfalse = M.empty, xpand = M.empty, 
-       bexprh = M.empty, constsh = M.empty, emptyh = M.empty}
+       ptrue = M.empty, pfalse = M.empty, newfact = M.empty, truerule = M.empty, 
+       xpand = M.empty, bexprh = M.empty, constsh = M.empty, emptyh = M.empty}
 
 collectb :: t -> t1 -> Body
 collectb rls bdy = Empty 
@@ -192,10 +194,18 @@ assigntohash hs nm bdy neg =
                 let tmphs = ptrue hs in 
                 let newhs = M.insert src "" tmphs in
                        hs { ptrue = newhs }
+      "truerule" ->  let src = getarg bdy 0 in 
+                let tmphs = truerule hs in 
+                let newhs = M.insert src "" tmphs in
+                       hs { truerule = newhs }
       "pfalse" ->  let src = getarg bdy 0 in 
                 let tmphs = pfalse hs in 
                 let newhs = M.insert src "" tmphs in
                        hs { pfalse = newhs }
+      "newfact" ->  let src = getarg bdy 0 in 
+                let tmphs = newfact hs in 
+                let newhs = M.insert src "" tmphs in
+                       hs { newfact = newhs }
       "pred" -> let src = getarg bdy 0 in 
                 let trgt = getarg bdy 1 in 
                 let hs' = addtype bdy nm 0 in 
@@ -400,15 +410,16 @@ citem handleall hash key accu =
    case tp of 
       Just "rule" -> checkground key hash' (crule hash' key (cmnt:accu)) accu 
       Just "constraint" -> checkground key hash' (cconstraint hash' key (cmnt:accu)) accu 
-      Just "assert" -> if handleall then (cassert hash' key (cmnt:accu)) else accu 
+      Just "assert" -> if handleall then (cassert hash' key (cmnt:accu)) else 
+                          -- Check here if this is newly generated one. 
+                          if (M.member key (newfact hash') ) then (cassert hash' key (cmnt:accu)) else accu 
       -- Just "composite" -> cassert hash key accu 
       Just x -> (Deny [Plain (Const ("Error at citem: unknown item: "++ x )) [] True]):accu 
       Nothing -> -- accu 
               (Deny [Plain (Const ("Error at citem: unknown ID: "++key )) [] True]):accu 
    where 
       checkground id h func accu = 
-        -- if (M.null (rassigns h)) && (doground h) 
-        if (nullorbogus h) && (doground h) 
+        if (nullorbogus h) && (doground h) && (not (M.member id (newfact h) ))
         -- then (RComment ("Not grounding: " ++ show(key) ++ " -- " ++ (show h))):accu 
         -- then (RComment ("Not grounding: " ++ show(key) ++ " -- " ++ show(doground h))):accu 
         then accu 
@@ -420,6 +431,7 @@ citem handleall hash key accu =
         if (M.null r) then True 
         else
             -- Check for a single variable "edge" with value "bogusmarker"
+            -- or any other content besides "edge".
             if ((M.size r) /= 1) then False
             else 
                 let a = M.lookup "\"edge\"" r in 
@@ -433,29 +445,45 @@ rendervars h =
   where 
     sval v k accu = accu ++ ("(" ++ v ++ ": " ++ k ++ ")")
 
-
+{--
 crule :: IntermediateR -> String -> [Rules] -> [Rules]
 crule hash key accu = 
-   let hdkm = M.lookup key (headsh hash) in 
-   let bdksm = M.lookup key (bodysh hash) in 
-   case (hdkm,bdksm) of 
-        (Just hdk, Just bdks) -> 
+   let unnecessary = M.lookup key (truerule hash) in 
+   case unnecessary of 
+      Nothing -> 
+        let hdkm = M.lookup key (headsh hash) in 
+        let bdksm = M.lookup key (bodysh hash) in 
+        case (hdkm,bdksm) of 
+           (Just hdk, Just bdks) -> 
               let hdc = chead hash (L.head hdk) in 
               let bdls = L.foldr (cbody hash) [] bdks in 
                   ((Rule hdc bdls):accu)
-        (_,_) -> ((RComment ("crule no key " ++ show(key))):accu)
+           (_,_) -> ((RComment ("crule no key " ++ show(key))):accu)
+      Just a -> -- this has been flagged as a truepred, s we treat it as an assertion 
+        -- ((RComment ("crule flagged true " ++ show(key))):cassert hash key accu)
+        (cassert hash key accu) ++ [(RComment ("rule flagged as true " ++ show(key)))] 
+--}
 
-crule'' :: IntermediateR -> String -> [Rules] -> [Rules]
-crule'' hash key accu = 
-   -- Unsafe, will raise exception if no such key, aka
-   -- incomplete refied file ...
-   let hdk = (headsh hash) M.! key in 
-   let hdc = chead hash (L.head hdk) in 
-   let bdks = (bodysh hash) M.! key in 
-   -- let bdks = (bexprh hash) M.! key in 
-   let bdls = L.foldr (cbody hash) [] bdks in 
-       ((Rule hdc bdls):accu)
-       -- (hdc:accu)
+crule :: IntermediateR -> String -> [Rules] -> [Rules]
+crule hash key accu = 
+   let unnecessary = M.lookup key (truerule hash) in 
+   case unnecessary of 
+      Nothing -> 
+        fullrule hash key accu 
+      Just a -> -- this has been flagged as a truepred, s we treat it as an assertion 
+        -- (cassert hash key accu) ++ [(RComment ("rule flagged as true " ++ show(key)))] 
+        (fullrule hash key accu) ++ [(RComment ("rule flagged as true " ++ show(key)))] 
+      where 
+      fullrule hash key accu = 
+        let hdkm = M.lookup key (headsh hash) in 
+        let bdksm = M.lookup key (bodysh hash) in 
+        case (hdkm,bdksm) of 
+           (Just hdk, Just bdks) -> 
+              let hdc = chead hash (L.head hdk) in 
+              let bdls = L.foldr (cbody hash) [] bdks in 
+                  ((Rule hdc bdls):accu)
+           (_,_) -> ((RComment ("crule no key " ++ show(key))):accu)
+              
 
 
 cconstraint hash key accu = 
@@ -512,8 +540,8 @@ cbody hash key accu =
       Just a -> 
            let isnegated = M.lookup key (negh hash) in 
            case isnegated of 
-             -- Nothing -> (Comment ("Potentially true and redendant " ++ show(key))):accu -- accu 
-             Nothing -> (Comment ("Potentially true and redendant " ++ show(key))):((actualbody hash key accu)) -- accu 
+             -- Nothing -> (Comment ("Potentially true and redundant " ++ show(key))):accu -- accu 
+             Nothing -> (Comment ("Known to be true and redundant " ++ show(key))):((actualbody hash key accu)) -- accu 
              Just a -> actualbody hash key accu 
     where 
       actualbody hash key accu = 
@@ -822,6 +850,8 @@ dereify'' rb =
 
 -- dereify (Right [Fact [Plain (Const "hasrule") [Number (Const "1"),Number (Const "2")] True],Fact [Plain (Const "rule") [Number (Const "2")] True],Fact [Plain (Const "pos") [Number (Const "3")] True],Fact [Plain (Const "head") [Number (Const "2"),Number (Const "3")] True],Fact [Plain (Const "neg") [Number (Const "6")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "6")] True],Fact [Plain (Const "pos") [Number (Const "9")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "9")] True]])
 -- dereify (Right [Fact [Plain (Const "hasrule") [Number (Const "1"),Number (Const "2")] True],Fact [Plain (Const "rule") [Number (Const "2")] True],Fact [Plain (Const "pos") [Number (Const "3")] True],Fact [Plain (Const "head") [Number (Const "2"),Number (Const "3")] True],Fact [Plain (Const "pred") [Number (Const "3"),Sym (Const "\"oncycle\"")] True],Fact [Plain (Const "var") [Number (Const "4"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "3"),Number (Const "1"),Number (Const "4")] True],Fact [Plain (Const "var") [Number (Const "5"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "alist") [Number (Const "3"),Number (Const "2"),Number (Const "5")] True],Fact [Plain (Const "neg") [Number (Const "6")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "6")] True],Fact [Plain (Const "pred") [Number (Const "6"),Sym (Const "\"other\"")] True],Fact [Plain (Const "var") [Number (Const "7"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "6"),Number (Const "1"),Number (Const "7")] True],Fact [Plain (Const "var") [Number (Const "8"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "alist") [Number (Const "6"),Number (Const "2"),Number (Const "8")] True],Fact [Plain (Const "pos") [Number (Const "9")] True],Fact [Plain (Const "body") [Number (Const "2"),Number (Const "9")] True],Fact [Plain (Const "pred") [Number (Const "9"),Sym (Const "\"edge\"")] True],Fact [Plain (Const "var") [Number (Const "10"),Sym (Const "\"X\"")] True],Fact [Plain (Const "alist") [Number (Const "9"),Number (Const "1"),Number (Const "10")] True],Fact [Plain (Const "var") [Number (Const "11"),Sym (Const "\"Y\"")] True],Fact [Plain (Const "alist") [Number (Const "9"),Number (Const "2"),Number (Const "11")] True]])
+
+-- dereify True (Right [Fact [Plain (Const "hasrule") [Number (Const "1"),Number (Const "24")] True],Fact [Plain (Const "assert") [Number (Const "24")] True],Fact [Plain (Const "head") [Number (Const "24"),Number (Const "25")] True],Fact [Plain (Const "pos") [Number (Const "25")] True],Fact [Plain (Const "pred") [Number (Const "25"),Sym (Const "\"edge\"")] True],Fact [Plain (Const "alist") [Number (Const "25"),Number (Const "1"),Number (Const "18")] True],Fact [Plain (Const "alist") [Number (Const "25"),Number (Const "2"),Number (Const "23")] True],Fact [Plain (Const "hasrule") [Number (Const "1"),Number (Const "16")] True],Fact [Plain (Const "assert") [Number (Const "16")] True],Fact [Plain (Const "pos") [Number (Const "17")] True],Fact [Plain (Const "head") [Number (Const "16"),Number (Const "17")] True],Fact [Plain (Const "rulepred") [Number (Const "16"),Number (Const "17")] True],Fact [Plain (Const "arity") [Number (Const "17"),Number (Const "2")] True],Fact [Plain (Const "pred") [Number (Const "17"),Sym (Const "\"edge\"")] True],Fact [Plain (Const "cnst") [Number (Const "18"),Sym (Const "\"2\"")] True],Fact [Plain (Const "alist") [Number (Const "17"),Number (Const "1"),Number (Const "18")] True],Fact [Plain (Const "cnst") [Number (Const "19"),Sym (Const "\"3\"")] True],Fact [Plain (Const "alist") [Number (Const "17"),Number (Const "2"),Number (Const "19")] True],Fact [Plain (Const "hasrule") [Number (Const "1"),Number (Const "20")] True],Fact [Plain (Const "assert") [Number (Const "20")] True],Fact [Plain (Const "pos") [Number (Const "21")] True],Fact [Plain (Const "head") [Number (Const "20"),Number (Const "21")] True],Fact [Plain (Const "rulepred") [Number (Const "20"),Number (Const "21")] True],Fact [Plain (Const "arity") [Number (Const "21"),Number (Const "2")] True],Fact [Plain (Const "pred") [Number (Const "21"),Sym (Const "\"edge\"")] True],Fact [Plain (Const "cnst") [Number (Const "22"),Sym (Const "\"3\"")] True],Fact [Plain (Const "alist") [Number (Const "21"),Number (Const "1"),Number (Const "22")] True],Fact [Plain (Const "cnst") [Number (Const "23"),Sym (Const "\"1\"")] True],Fact [Plain (Const "alist") [Number (Const "21"),Number (Const "2"),Number (Const "23")] True]])
 dereify :: Bool -> Either ParseError [Rules] -> String 
 dereify ground x = 
     let (y,hs) = dereify' x ground in 
