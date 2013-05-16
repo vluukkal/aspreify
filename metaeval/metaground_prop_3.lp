@@ -30,7 +30,28 @@
 
 % How about negation?
 % But this will only come from ground rules and is hence not global. 
-truepred(Predid) :- sbindit(Rid,Predid,Jpredid), not neg(Predid). 
+truepred3(Predid) :- sbindit(Rid,Predid,Jpredid), not neg(Predid). 
+
+truepred(Predid) :- 
+     not neg(Predid), 
+     pred(Predid, Pn), 
+     assert(Aid), 
+     head(Aid,Hid), 
+     pred(Hid,Pn). 
+
+truepred2(Predid,Hid) :- 
+     not neg(Predid), 
+     pred(Predid, Pn), 
+     assert(Aid), 
+     head(Aid,Hid), 
+     Predid != Hid, 
+     pred(Hid,Pn). 
+
+trueprules(Rid,Hid) :- 
+    abody(Rid,Predid), 
+    not manybodies(Rid), 
+    truepred2(Predid,Hid). 
+
 
 % A non-bindit version of truepred, which only applies 
 % to single predicates in a body, 

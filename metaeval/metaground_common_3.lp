@@ -137,7 +137,7 @@ exists_mkassign_conj :- mkassign_conj(R,A,C).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-#hide.
+% #hide.
 
 #show mkassign/3.
 #show boundexpandvv/7.
@@ -184,3 +184,4 @@ exists_mkassign_conj :- mkassign_conj(R,A,C).
 %#show other/1. 
 
 % EOF metaground_common.lp 
+

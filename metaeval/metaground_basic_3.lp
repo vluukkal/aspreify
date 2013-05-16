@@ -23,7 +23,8 @@
 % Generate all possible bindings
 % As assert may now be generated, we move it out of the choice
 % {sbindit(Rid,Predid,Jpredid) : rulepred(Rid,Predid) : assert(Aid) : rulepred(Aid,Jpredid)} :- ground(Rid). 
-{sbindit(Rid,Predid,Jpredid) : rulepred(Rid,Predid) : rulepred(Aid,Jpredid)} :- ground(Rid), assert(Aid). 
+% {sbindit(Rid,Predid,Jpredid) : rulepred(Rid,Predid) : rulepred(Aid,Jpredid)} :- ground(Rid), assert(Aid). 
+{sbindit(Rid,Predid,Jpredid) : rulepred(Rid,Predid) : rulepred(Aid,Jpredid)} :- assert(Aid). 
 
 % We cant bind a head
 %:- 
@@ -66,7 +67,7 @@ nobindinhead(Rid) :-
 mapped(Predid) :- sbindit(Rid,Predid,Jpredid). 
 unmapped(Predid1) :- 
   not mapped(Predid1), 
-  ground(Rid), 
+  % ground(Rid), % YYY 
   not head(Rid,Predid1),
   rulepred(Rid,Predid1). 
 
@@ -168,7 +169,8 @@ predval(Aid,Pn,N,Val) :-
 % There is a potential variable binding in the rule Rid
 % This is just potential, this may be problematic when 
 % later on we want to constrain this...
-potbinding(Rid) :- 
+potbinding(Rid) :- potbindingpred(Rid,Predid,Pn). 
+potbindingpred(Rid,Predid,Pn) :- 
     % First there is a relevant rule with a predicate
     need_var_bindings(Rid), 
     rulepred(Rid,Predid), % Thes two are a bit redundant, could be in need_*
