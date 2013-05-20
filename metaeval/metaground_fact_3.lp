@@ -15,6 +15,34 @@
 % 4.3 for f in *.ground; do cat $f >> foo.lp.reified.res; done 
 %   
 
+% Make a Lua counter 
+#begin_lua
+local idctr = 0
+
+function nxtctr(inc) 
+  idctr = idctr + inc
+  return idctr
+end 
+
+function nxtctr2(inc) 
+  res = idctr 
+  idctr = idctr + inc
+  return res 
+end 
+
+
+function setctr(ctr)
+  idctr = ctr
+  return idctr
+end 
+
+function getctr()
+  return idctr
+end
+
+#end_lua.
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Now we try to ground all immediately groundable 
 % or projected rules globally, not caring about the ground() rule.
@@ -98,6 +126,22 @@
 
 %maxctr(X) :- freectr(X).
 
+% This assumes we always have two freectr's, now we generate 
+% it by the factrenderer, so that there always is freectr(0).
+%maxctr(C) :-
+%    freectr(C),
+%    freectr(C1),
+%    C > C1. 
+
+%maxctr(C)  :- 
+%    freectr(C),
+%    not freectr(C1),
+%    C != C2. 
+
+% maxctr(@setctr(C)) :- freectr(C).
+freectr(@setctr(C)) :- freectr(C).
+
+
 % assert(Rid) :- trueprule(Rid). 
 
 % This seems to have stopped stuff badly 
@@ -114,14 +158,52 @@
 % We use the unique IDs of the assertions to form 'namespaces' to avoid conflicts
 % This may backfire if we create a new ground rule with so many bodies that the 
 % incremented IDs overflow to the 'next' new ground rule. 
-6 { hasrule(1,Aid+Hid), newfact(Aid+Hid), assert(Aid+Hid), head(Hid+Aid,Hid+Aid+1), pos(Hid+Aid+1), pred(Hid+ Aid + 1, Pn ) } 6 :- 
+% 7 { hasrule(1,Aid+Hid), newfact(Aid+Hid), assert(Aid+Hid), head(Hid+Aid,Hid+Aid+1), pos(Hid+Aid+1), pred(Hid+ Aid + 1, Pn ), nxt(@nxtctr2(Aid)) } 7 :- 
+% 8 { hasrule(1,@getctr()), newfact(@getctr(), Rid, Hid), assert(@getctr()), head(@getctr(),@getctr()+1), pos(@getctr()+1), pred(@getctr() + 1, Pn ), alist(@getctr() + 1,N1,Cid), nxt(@nxtctr2(Hid)) } 8 :-
+7 { hasrule(1,@getctr()), newfact(@getctr(), Rid, Hid), assert(@getctr()), head(@getctr(),@getctr()+1), pos(@getctr()+1), pred(@getctr() + 1, Pn ), nxt(@nxtctr2(Hid)) } 7 :-
+    % Hid will make Rid true 
     trueprules(Rid, Hid), 
     head(Rid,Predid), 
     pred(Predid,Pn),
-    freectr(Aid).
-
-
-
+    freectr(Aid). 
+    % New stuff for alist here
+%    alist(Predid,N1,Varid),
+%    var(Varid,Vn), 
+%    % Now the same variable in body 
+%    body(Rid,Bid),
+%    % Must have same variable name, but at position N2
+%    var(BVarid,Vn), 
+%    alist(Bid,N2,BVarid),
+%    % Now we look at the ground fact at position N2
+%    % Pn2 is the name of the ground fact. 
+%    % pred(Hid,Pn2), 
+%    alist(Hid,N2,Cid),               % get the constant ID responsible for this variables
+%    cnst(Cid,Val). 
+    
+% We have generated head for a new ground fact.
+% Here we generate the argument list for the head and for this
+% we need a handle to the new ground fact source rule and justifying rule 
+% We use newfact/3 here to trigger the generation.
+alist(Id+1,N1,Cid) :- 
+    % A new fact ID has been generated for 
+    newfact(Id,Rid,Jid), 
+    % This is the variable on the head of the generated rule
+    % and this must be mapped to a constant.
+    head(Rid,Predid), 
+    pred(Predid,Pn),
+    alist(Predid,N1,Varid),
+    var(Varid,Vn), 
+    % Now we look for the same variable in the body to know where 
+    % (which position) we should look for the constant.
+    body(Rid,Bid),
+    % Must have same variable name, but at position N2
+    var(BVarid,Vn), 
+    alist(Bid,N2,BVarid),
+    % Finally, we connect the constant from the ground fact 
+    % with the variable in the head. 
+    alist(Jid,N2,Cid),               % This is the actual constant 
+    cnst(Cid,Val). 
+    
 pot_fact(Rid) :- 
     trueprule(Rid), 
     head(Rid,Predid), 
@@ -129,25 +211,26 @@ pot_fact(Rid) :-
     freectr(Aid).
 
 % Generate alist for the new facts
-alist(Aid + Hid + 1,N1,Cid) :- 
-    % Hid is the one where we have the constant value
-    % Rid is where we access the variable information 
-    trueprules(Rid, Hid), 
-    % Pn is the name of the ground fact. 
-    pred(Hid,Pn), 
-    % Now we get the variable info, Vn is the variable in the head at position N1
-    head(Rid,Predid),
-    alist(Predid,N1,Varid),
-    var(Varid,Vn), 
-    % Now the same variable in body 
-    body(Rid,Bid),
-    % Must have same variable name, but at position N2
-    var(BVarid,Vn), 
-    alist(Bid,N2,BVarid),
-    % Now we look at the ground fact at position N2
-    alist(Hid,N2,Cid),               % get the constant ID responsible for this variables
-    cnst(Cid,Val), 
-    freectr(Aid).
+% alist(Aid + Hid + 1,N1,Cid) :- 
+%alist(@getctr() + 1,N1,Cid) :- 
+%    % Hid is the one where we have the constant value
+%    % Rid is where we access the variable information 
+%    trueprules(Rid, Hid), 
+%    % Pn is the name of the ground fact. 
+%    pred(Hid,Pn), 
+%    % Now we get the variable info, Vn is the variable in the head at position N1
+%    head(Rid,Predid),
+%    alist(Predid,N1,Varid),
+%    var(Varid,Vn), 
+%    % Now the same variable in body 
+%    body(Rid,Bid),
+%    % Must have same variable name, but at position N2
+%    var(BVarid,Vn), 
+%    alist(Bid,N2,BVarid),
+%    % Now we look at the ground fact at position N2
+%    alist(Hid,N2,Cid),               % get the constant ID responsible for this variables
+%    cnst(Cid,Val), 
+%    freectr(Aid).
 
 % Generate alist for the new facts
 %alist(Aid + Hid,N1,Cid) :- 
@@ -170,7 +253,7 @@ allmydpreds(Pn,Predid) :-
 % Check the sbind consistency 
 newnotbound(Jpredid) :- 
     assert(Aid),
-    newfact(Aid), 
+    newfact(Aid,Arid,Hid),  
     head(Aid,Jpredid),
     ground(Rid), 
     body(Rid,Predid),
