@@ -302,8 +302,8 @@ goodassign(Lid,Rid) :-
   pred(Hid,Pn). 
 
 4 { 
-  alist(New+1,N,New+1+A),
-  cnst(New+1+A,Val), % A or N?
+  alist(New+1,N,New+N+A),
+  cnst(New+N+A,Val), % A or N?
   assert(New),
   arity(New+1,A)
 } 4
