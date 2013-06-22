@@ -265,6 +265,52 @@ tstassign(Lid,Rid,Vn,Val) :-
   alist(Jid,Bpredidx,Cid), 
   cnst(Cid,Val).
 
+% Sameassign
+sameassign(Lid,Rid,Aid,N) :- 
+  % Get the index of the argument number 
+  % for the new candidate:
+  % predicate Pn has value Val1 at position N.
+  tstassign(Lid,Rid,Vn,Val1),   
+  head(Rid,Hid1), 
+  alist(Hid1,N,Vid1), 
+  var(Vid1,Vn), 
+  arity(Hid1,A1), 
+  pred(Hid1,Pn), 
+  % Now compare to existing facts 
+  assert(Aid), 
+  head(Aid,Hid2), 
+  % Same predicate name with same Value at the same place
+  pred(Hid2,Pn), 
+  alist(Hid2,N,Cid1),
+  cnst(Cid1,Val1). 
+
+% Meaning that at least one argument is different 
+diffassign(Lid,Rid,Aid,N) :- 
+  % Get the index of the argument number 
+  % for the new candidate:
+  % predicate Pn has value Val1 at position N.
+  tstassign(Lid,Rid,Vn,Val1),   
+  head(Rid,Hid1), 
+  alist(Hid1,N,Vid1), 
+  var(Vid1,Vn), 
+  arity(Hid1,A1), 
+  pred(Hid1,Pn), 
+  % Now compare to existing facts 
+  assert(Aid), 
+  head(Aid,Hid2), 
+  % Same predicate name with different Value at the same place
+  pred(Hid2,Pn), 
+  alist(Hid2,N,Cid1),
+  cnst(Cid1,Val2),
+  Val1 != Val2. 
+
+projectsame(Lid,Rid,Aid) :- sameassign(Lid,Rid,Aid,N). 
+projectdiff(Lid,Rid,Aid) :- diffassign(Lid,Rid,Aid,N). 
+
+goodassign(Lid,Rid) :-  
+  projectdiff(Lid,Rid,Aid),
+  not badassign(Lid,Rid).
+
 badassign(Lid,Rid) :- 
   tstassign(Lid,Rid,Vn,Val1),   
   tstassign(Lid,Rid,Vn,Val2), 
