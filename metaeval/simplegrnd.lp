@@ -143,24 +143,42 @@ foo :- % avoid clutter for now
 % len  - the length of the list in the tail
 
 % Make each mapitem into a list of length one. 
-2 { 
-  litem(@getctr(), Mapid, 0, 1), 
-  % lst(@mklist(@getctr(),1)), 
-  nxt(@nxtctr(1))
-} 2 :- 
-  map(Mapid,Rid,N,Predid). 
-
-% Make each mapitem into a list of length one. 
 %2 { 
-%  litem2(@getctr(), @getctr(), Mapid, 0, 1), 
+%  litem(@getctr(), Mapid, 0, 1), 
 %  % lst(@mklist(@getctr(),1)), 
 %  nxt(@nxtctr(1))
 %} 2 :- 
 %  map(Mapid,Rid,N,Predid). 
 
+% Make each mapitem into a list of length one for a particular rule 
+%2 { 
+%  litem(@getctr(), Rid, Mapid, 0, 1), 
+%  % lst(@mklist(@getctr(),1)), 
+%  nxt(@nxtctr(1))
+%} 2 :- 
+%  map(Mapid,Rid,N,Predid). 
 
-%blargisinlist(Listid,Listid,Mapid) :- 
-%  litem(Listid,Mapid,_,_).
+% Make each mapitem for position one into a list of length one for a particular rule 
+2 { 
+  litem(@getctr(), Rid, Mapid, 0, 1), 
+  nxt(@nxtctr(1))
+} 2 :- 
+  map(Mapid,Rid,1,Predid). 
+
+2 { 
+  litem(@getctr(), Rid, Mapid, Lid1, N), 
+  nxt(@nxtctr(1))
+} 2 :- 
+  % We have a map item for body position N
+  map(Mapid,Rid,N,Predid),
+  % We have an existing list for position M ...
+  % litem(Lid1,Rid,Mapid1, Nxt, N+1),  
+  litem(Lid1,Rid,Mapid1, Nxt, M),  
+  % ... where M is one less than N
+  bodycount(Rid,Maxn), 
+  N == M+1, 
+  M <= Maxn. 
+
 
 %isinlist(Parentid,Listid,Mapid) :- 
 %  litem(Listid,Mapid,Next,_),
@@ -169,22 +187,24 @@ foo :- % avoid clutter for now
 
 %2 { lc2(Listid, Mapid1), lc2(Listid, Mapid2) } 2  :- 
 % chunga :- 
+
+% List closure 
 lc2(Listid,Mapid1) :- 
-  litem(Listid,Mapid1,Nxt,Len), 
-  litem(Nxt,Mapid2,Nxt2,Len2). 
+  litem(Listid,Rid,Mapid1,Nxt,Len), 
+  litem(Nxt,Rid,Mapid2,Nxt2,Len2). 
 
 lc2(Listid,Mapid2) :- 
-  litem(Listid,Mapid1,Nxt,Len), 
-  litem(Nxt,Mapid2,Nxt2,Len2). 
+  litem(Listid,Rid,Mapid1,Nxt,Len), 
+  litem(Nxt,Rid,Mapid2,Nxt2,Len2). 
 
 lc2(Listid,Mapid2) :- 
   lc2(Listid,Mapid1), 
-  litem(Listid2, Mapid1, Nxt, Len), 
-  litem(Nxt, Mapid2, Nxt2, Len). 
+  litem(Listid2, Rid,Mapid1, Nxt, Len), 
+  litem(Nxt, Rid, Mapid2, Nxt2, Len). 
 
 isinlist(L,M) :- lc2(L,M). 
 % This is for lists of length 1, singletons 
-isinlist(L,M) :- litem(L, M, 0, 1).
+isinlist(L,M) :- litem(L, Rid, M, 0, 1).
 
 %foo :- 
 % listclosure(Listid,Mapid,Mapid2) :- 
@@ -206,35 +226,35 @@ isinlist(L,M) :- litem(L, M, 0, 1).
 
 
 listlen(Listid,N) :- 
-  litem(Listid,Mapid,Next,N). 
+  litem(Listid,Rid, Mapid,Next,N). 
 
 
 % Now for any two singleton map(list)s put them to another list 
-2 { 
-  litem(@getctr(), Mapid1, Listid2, 2), 
-  nxt(@nxtctr(1))
-} 2 :- 
-  % Three next lines are generic
-  litem(Listid1,Mapid1,0,1),
-  litem(Listid2,Mapid2,0,1),
-  Mapid1 != Mapid2. 
+%2 { 
+%  litem(@getctr(), Rid, Mapid1, Listid2, 2), 
+%  nxt(@nxtctr(1))
+%} 2 :- 
+%  % Three next lines are generic
+%  litem(Listid1,Rid,Mapid1,0,1),
+%  litem(Listid2,Rid,Mapid2,0,1),
+%  Mapid1 != Mapid2. 
 
 % We keep growing the lists, for any list of N-1,
 % we recombine it to a list of N. 
 % What if no N-1 available. 
-2 { 
-  litem(@getctr(), Mapid1, Listid2, N), 
-  nxt(@nxtctr(1))
-} 2 :- 
+%2 { 
+%  litem(@getctr(), Rid,Mapid1, Listid2, N), 
+%  nxt(@nxtctr(1))
+%} 2 :- 
   % Three next lines are generic
-  litem(Listid1,Mapid1,0,1),
-  litem(Listid2,Mapid2,Nxt2,N-1),
+%  litem(Listid1,Rid,Mapid1,0,1),
+%  litem(Listid2,Rid,Mapid2,Nxt2,N-1),
   % Mapid1 != Mapid2, 
-  not isinlist(Listid2,Mapid1),
+%  not isinlist(Listid2,Mapid1),
   % Now we make some constraints about the list 
-  bodycount(Rid,N),       % only up to N 
-  map(Mapid1,Rid,N1,_),   % must have same RID, maybe diferent N1,N2
-  map(Mapid2,Rid,N2,_). 
+%  bodycount(Rid,N),       % only up to N 
+%  map(Mapid1,Rid,N1,_),   % must have same RID, maybe diferent N1,N2
+%  map(Mapid2,Rid,N2,_). 
 
 % We should be able to grow, or shrink, generate list items for N > 1 up to 
 % N. This would be kind of like starting a recursion up or down. 
@@ -243,19 +263,21 @@ listlen(Listid,N) :-
 % to produce an OK wrt. the rules and produced variables. 
 % Potentials are those lists that have the same length
 % as indicated by bodycount. 
+% This should no longer be needed, lists are potential by construction 
 potential(Rid,Lid) :- 
   bodycount(Rid,N), 
-  litem(Lid,Mapid,Nxt,N). 
+  litem(Lid,Rid,Mapid,Nxt,N). 
 
 
 
 % Now we assign the N'th bodypredicate of Rid according to Lid
+% This is just renaming the information in the list for now. 
 mkassign(Lid,Rid,Predid,Mapid,Jid,N) :- 
   potential(Rid,Lid), 
   bodylist(Rid,N,Predid), 
   % There is a mapid in this list 
   isinlist(Lid,Mapid),
-  litem(Lid2,Mapid,Nxt,N), % now the index is matched to bodylist ...
+  litem(Lid2,Rid,Mapid,Nxt,N), % now the index is matched to bodylist ...
   % Which pertains to this N'th bodypredicate 
   map(Mapid, Rid, N, Jid). 
 
@@ -265,12 +287,260 @@ tstassign(Lid,Rid,Vn,Val) :-
   alist(Jid,Bpredidx,Cid), 
   cnst(Cid,Val).
 
+assignat(Lid,Rid,Bpredidx,Vn,Val) :- 
+  mkassign(Lid,Rid,Predid,Mapid,Jid,N), 
+  bodyvarpos(Rid,Vn,N,Bpredidx), 
+  alist(Jid,Bpredidx,Cid), 
+  cnst(Cid,Val).
+
+% ---------------------
+
+% Derive a simple position, value assignment for a rule 
+% to be compared with groundassign/3.
+assign(Lid,Rid,N,Val) :- 
+  mkassign(Lid,Rid,Predid,Mapid,Jid,N), 
+  headvarval(Rid,Pn,N,Vn,Bidx,Bpredidx), 
+  alist(Jid,Bpredidx,Cid), 
+  cnst(Cid,Val).
+
+% Could also use nxt(X) and X instead of getctr. 
+%timedassign(Lid,@getctr(),Rid,N,Val) :- 
+%  mkassign(Lid,Rid,Predid,Mapid,Jid,N), 
+%  headvarval(Rid,Pn,N,Vn,Bidx,Bpredidx), 
+%  alist(Jid,Bpredidx,Cid), 
+%  cnst(Cid,Val).
+
+
+% Derive a simple position, value assignment for an existing
+% ground predicate to be compared with assign/5.  
+groundassign(Jid,N,Val) :- 
+  assert(Jid),
+  head(Jid,Predid),
+  alist(Predid,N,Cid), 
+  cnst(Cid,Val). 
+
+%timedgroundassign(Jid,@getctr(),N,Val) :- 
+%  assert(Jid),
+%  head(Jid,Predid),
+%  alist(Predid,N,Cid), 
+%  cnst(Cid,Val). 
+
+% ---------------------
+% Start comparing the potential, list based assignments (internal facts) with the 
+% existing ground facts (external facts). 
+
+onediffext(Lid,Rid,Jid,N) :- 
+  assign(Lid,Rid,N,Val1), 
+  groundassign(Jid,N,Val2), 
+  Val1 != Val2, 
+  % Same predicate name 
+  head(Rid,Headid), 
+  head(Jid,JHeadid), 
+  pred(Headid,Pn), 
+  pred(JHeadid,Pn). 
+
+onesameext(Lid,Rid,Jid,N) :- 
+  assign(Lid,Rid,N,Val1), 
+  groundassign(Jid,N,Val2), 
+  Val1 == Val2, 
+  % Same predicate name 
+  head(Rid,Headid), 
+  head(Jid,JHeadid), 
+  pred(Headid,Pn), 
+  pred(JHeadid,Pn). 
+
+fulldiffext(Lid,Rid,Jid) :- 
+  assign(Lid,Rid,_,_), 
+  groundassign(Jid,_,_), 
+  % Different predicate name 
+  head(Rid,Headid), 
+  head(Jid,JHeadid), 
+  pred(Headid,Pn1), 
+  pred(JHeadid,Pn2),
+  Pn1 != Pn2. 
+  
+% One differing argument is enough to make it completely different 
+fulldiffext(Lid,Rid,Jid) :- 
+  onediffext(Lid,Rid,Jid,N).
+
+%novel(Lid,Rid,@getctr()) :- 
+%  assert(Jid), 
+%  assign(Lid,Rid,_,_),      % we have an assignment, but we ignore the values, could be a projection ...
+%  not fullsameext(Lid,Rid,Jid). 
+
+onesame(Lid,Rid,@getctr()) :- 
+  fullsameext(Lid,Rid,Jid). 
+
+novelext(Lid,Rid,@getctr()) :- 
+  assign(Lid,Rid,_,_), 
+  not onesame(Lid,Rid,@getctr()).
+
+% Pick one of internal to be a representative
+%novelinternal(Lid1)
+%:- 
+%  fullsameint(Lid1,Rid,Lid2),
+%  not novelinternal(Lid1).
+
+% We create a cluster of equivalent lists
+% Should we have a dictionary?
+4 {
+eqcluster(@getctr(), Lid1, Rid),
+eqcluster(@getctr(), Lid2, Rid),
+primus(@getctr(),Lid1), 
+nxt(@nxtctr(1))
+} 4 :- 
+  fullsameint(Lid1,Rid,Lid2), 
+  not prprimus(Lid2).        
+  % not prprimus(Lid1).        % This unsats
+  % not primus(X,Lid1),        % These two diverge 
+  % nxt(X).		       % ...
+
+prprimus(Lid) :- primus(X,Lid). 
+
+smallestsame(Lid1,Rid) :- 
+  fullsameint(Lid1,Rid,Lid2), 
+  fullsameint(Lid2,Rid,Lid3),
+  Lid1 < Lid3,
+  Lid1 < Lid2.
+
+largestsame(Lid3,Rid) :- 
+  fullsameint(Lid1,Rid,Lid2),
+  fullsameint(Lid2,Rid,Lid3),
+  Lid3 > Lid1,
+  Lid3 > Lid2.
+
+% Now try to attach other equivalent ones to this cluster 
+eqcluster(X,LidSame,Rid) :- 
+  primus(X,Lid),
+  fullsameint(Lid,Rid,LidSame). 
+
+% Clusters of same values may be built on different 
+% primuses. 
+samecluster(C1,C2) :- 
+  primus(C1,Lid1), 
+  primus(C2,Lid2), 
+  not samecluster(C2,C1), 
+  fullsameint(Lid1,Rid,Lid2).
+
+
+% This does not pertain to predicates with more than one argument
+fullsameext(Lid,Rid,Jid) :- 
+  onesameext(Lid,Rid,Jid,N1), 
+  assert(Jid2), 
+  not fulldiffext(Lid,Rid,Jid).
+
+% For cases with one argument
+fullsameext(Lid,Rid,Jid) :- 
+  head(Rid,Hid), 
+  arity(Hid,1), 
+  onesameext(Lid,Rid,Jid,N). 
+
+% ---------------------
+% Compare the potential, list based assignments (internal facts) with themselves
+% replicating the structure of the external comparisons. 
+
+% Note that since both refer to same Rid, 
+% we dont have to check the predicate. 
+onediffint(Lid1,Rid,Lid2,N) :- 
+  assign(Lid1,Rid,N,Val1), 
+  assign(Lid2,Rid,N,Val2), 
+  Lid1 != Lid2, 
+  Val1 != Val2. 
+
+onesameint(Lid1,Rid,Lid2,N) :- 
+  assign(Lid1,Rid,N,Val1), 
+  assign(Lid2,Rid,N,Val2), 
+  Lid1 != Lid2, 
+  Val1 == Val2. 
+
+fulldiffint(Lid1,Rid,Lid2) :- 
+  onediffint(Lid1,Rid,Lid2,N).
+
+% This does not pertain to predicates with more than one argument
+fullsameint(Lid1,Rid,Lid2) :- 
+  onesameint(Lid1,Rid,Lid2,N1), 
+  Lid1 < Lid2, % XXX 
+  not fulldiffint(Lid1,Rid,Lid2).
+
+% For cases with one argument
+fullsameint(Lid,Rid,Jid) :- 
+  head(Rid,Hid), 
+  arity(Hid,1), 
+  onesameint(Lid,Rid,Jid,N). 
+
+
+% Make a closure of fullsameint's 
+fullsameint(Lid1,Rid,Lid3) :- 
+  onesameint(Lid1,Rid,Lid2,N1), 
+  onesameint(Lid2,Rid,Lid3,N2), 
+  Lid1 < Lid3, % XXX 
+  not fulldiffint(Lid1,Rid,Lid3).
+
+
+% ---------------------
+
+% ---------------------
+
+
+
+visibleassign(Lid,Rid,Vn,Val) :- 
+  mkassign(Lid,Rid,Predid,Mapid,Jid,N), 
+  headvarval(Rid,Pn,N,Vn,Bidx,Bpredidx), 
+  alist(Jid,Bpredidx,Cid), 
+  cnst(Cid,Val).
+
+% If any two items in a list are same at same indexes
+% we get novelfact
+% novelfact(Lid,Rid) :- 
+
+% If any two items in a list are different at same indexes
+% we get nonnovelfact. 
+%nonnovelfact(Lid,Rid,N) :- 
+  % Find a predicate with the same name
+  % as the derivation of this rule. 
+%  assert(Aid), 
+%  head(Aid,Hid), 
+%  pred(Hid,Pn),      % 1. Pn must match 
+%  alist(Hid,N,Cid),
+%  cnst(Cid,Cval), 
+%  % Now get the value from the assignment 
+%  head(Rid,Nid),
+%  pred(Nid,Pn),       % [1] Must match Pn 
+  
+
 % Sameassign
+% samealids(Lid1,Rid,Lid2,N) :- 
+samealids(Lid1,Rid,Vn,Lid2) :- 
+  % Get the index of the argument number 
+  % for the new candidate:
+  % predicate Pn has value Val1 at position N.
+  % tstassign(Lid,Rid,Vn,Val1),   
+  visibleassign(Lid1,Rid,Vn,Val1),   
+  visibleassign(Lid2,Rid,Vn,Val2),
+  Lid1 != Lid2,
+  Val1 = Val2. 
+
+diffalids(Lid1,Rid,Vn,Lid2) :- 
+  % Get the index of the argument number 
+  % for the new candidate:
+  % predicate Pn has value Val1 at position N.
+  % tstassign(Lid,Rid,Vn,Val1),   
+  visibleassign(Lid1,Rid,Vn,Val1),   
+  visibleassign(Lid2,Rid,Vn,Val2),
+  Lid1 != Lid2,
+  Val1 != Val2. 
+
+projectdiffalid(Lid1,Rid,Lid2) :- diffalids(Lid1,Rid,Vn,Lid2).
+
+
+% Is there an assignment to position N 
+% of Rid in ground predicate Aid. 
 sameassign(Lid,Rid,Aid,N) :- 
   % Get the index of the argument number 
   % for the new candidate:
   % predicate Pn has value Val1 at position N.
-  tstassign(Lid,Rid,Vn,Val1),   
+  % tstassign(Lid,Rid,Vn,Val1),   
+  visibleassign(Lid,Rid,Vn,Val1),   
   head(Rid,Hid1), 
   alist(Hid1,N,Vid1), 
   var(Vid1,Vn), 
@@ -284,12 +554,15 @@ sameassign(Lid,Rid,Aid,N) :-
   alist(Hid2,N,Cid1),
   cnst(Cid1,Val1). 
 
-% Meaning that at least one argument is different 
+% Negation of sameassign/4
+% Meaning that at least one argument is different, so at least 
+% one argument of Aid is incomaptible with Lid. 
 diffassign(Lid,Rid,Aid,N) :- 
   % Get the index of the argument number 
   % for the new candidate:
   % predicate Pn has value Val1 at position N.
-  tstassign(Lid,Rid,Vn,Val1),   
+  % tstassign(Lid,Rid,Vn,Val1),   
+  visibleassign(Lid,Rid,Vn,Val1),   
   head(Rid,Hid1), 
   alist(Hid1,N,Vid1), 
   var(Vid1,Vn), 
@@ -304,13 +577,87 @@ diffassign(Lid,Rid,Aid,N) :-
   cnst(Cid1,Val2),
   Val1 != Val2. 
 
+% This enumerates those ground predicates 
+% which may be pertinent for this List of assignments. 
+feasibleground(Lid,Rid,Aid) :- 
+  visibleassign(Lid,Rid,Vn,Val), 
+  head(Rid,Predid),
+  pred(Predid,Pn), 
+  % There is an assertion with same predicatename
+  assert(Aid),
+  head(Aid,Justid),
+  pred(Justid,Pn).
+
+% For any two Ground facts the Lid is different or not same 
+% reallynow(Lid,Rid,Aid,N) :- 
+% alldiffer(Lid,Rid) :- 
+%  diffassign(Lid,Rid,Aid1,N), 
+
+  % There is an assignment list 
+%  potential(Rid,Lid),
+  % The predicate names of Rid and Aid must be same 
+%  head(Rid,Predid),
+%  pred(Predid,Pn), 
+  % There is an assertion
+%  assert(Aid1),
+%  head(Aid1,Justid1),
+%  pred(Justid1,Pn1),
+%  not reallysame(Lid,Rid,Aid1). 
+
+% Another way:
+% 1. There cannot be an assertion
+% 2.1 that would be the same
+% 2.2 that would be the same
+
+% Tag each assertion with differ or same... 
+% differ(Rid,Aid,Lid)
+% same(Rid,Aid,Lid)
+
+
+% Something is really same, if there are no diffassign/4 
+% associated with it, but there is a sameassign. 
+reallysame(Lid,Rid,Aid) :- 
+  sameassign(Lid,Rid,Aid,N1), 
+  head(Aid,Predid),
+  alist(Predid,N2,Cid), 
+  not diffassign(Lid,Rid,Aid,N2), 
+  % And the assertion has not been produced by this lid
+  not assigned(Lid,Aid).
+
+projectreallysame(Lid,Rid) :- reallysame(Lid,Rid,Aid).
+
+
+reallydiff(Lid,Rid,Aid) :- 
+  projectdiff(Lid,Rid,Aid),
+  not projectreallysame(Lid,Rid). 
+
+
 projectsame(Lid,Rid,Aid) :- sameassign(Lid,Rid,Aid,N). 
+
+% If there is a single projectdiff, then they are different 
 projectdiff(Lid,Rid,Aid) :- diffassign(Lid,Rid,Aid,N). 
 
+% All arguments are same and there is no single 
+% differing argument. So Lid and Aid are the same. 
+samelistground(Rid,Lid,Aid) :- 
+  projectsame(Lid,Rid,Aid), 
+  not projectdiff(Lid,Rid,Aid).
+  
+projectsameground(Rid,Lid) :- samelistground(Rid,Lid,Aid). 
+
+% Find a differing one which is not same with anything 
+% Truly novel
+%reallydiff(Lid,Rid) :-
+%  projectdiff(Lid,Rid,Aid),
+%  not projectsameground(Rid,Lid). 
+
 goodassign(Lid,Rid) :-  
+  not fsame(Lid,Rid), % XXX
+  not prassigned(Lid), 
   projectdiff(Lid,Rid,Aid),
   not badassign(Lid,Rid).
 
+% Do we have two assignments with different values to the same variable name 
 badassign(Lid,Rid) :- 
   tstassign(Lid,Rid,Vn,Val1),   
   tstassign(Lid,Rid,Vn,Val2), 
@@ -323,42 +670,90 @@ badassign(Lid,Rid) :-
   headvarval(Rid,Pn,N,Vn,X1,X2),
   not iststassigned(Lid,Rid,Vn).
 
+% What case does this cover? If this is not here no multiple arguments
 goodassign(Lid,Rid) :- 
-  tstassign(Lid,Rid,Vn,Val), 
+  % tstassign 		   
+  % not prassigned(Lid), 
+  visibleassign(Lid,Rid,Vn,Val), 
   not badassign(Lid,Rid). 
 
 % Handle the single body case here; it is always good. 
-goodassign(Lid,Rid) :- 
-  tstassign(Lid,Rid,Vn,Val), 
-  bodycount(Rid,1). 
+%goodassign(Lid,Rid) :- 
+%  not prassigned(Lid), 
+%  tstassign(Lid,Rid,Vn,Val), 
+%  bodycount(Rid,1). 
+
+
+% Each time we create a new 
+2 {
+  nxtassign(@getctr(), Lid, Rid), 
+  nxt(@nxtctr(1))
+} 2 :- 
+  % not prassigned(Lid), 
+  visibleassign(Lid,Rid,Vn,Val), 
+  not badassign(Lid,Rid). 
+  
 
 % For any good assignment we make a new head
-7 {   
-  hasrule(1,@getctr()), 
-  newname(@getctr(),Lid,"JOPI"), 
-  newpotfact(@getctr(), Rid), 
-  head(@getctr(),@getctr()+1), 
-  pos(@getctr()+1), 
-  pred(@getctr() + 1, Pn ),
-  nxt(@nxtctr(N+2))
-} 7 :- 
+%8 {   
+%  hasrule(1,@getctr()), 
+%  newname(@getctr(),Lid,"JOPI"), 
+%  newpotfact(@getctr(), Rid), 
+%  head(@getctr(),@getctr()+1), 
+%  pos(@getctr()+1), 
+%  pred(@getctr() + 1, Pn ),
+%  assigned(Lid,@getctr()), 
+%  nxt(@nxtctr(N+2))
+%} 8 :- 
+oink :- % XXX 
   goodassign(Lid,Rid),
+  % not projectreallysame(Lid,Rid), % will generate a large amount of answer sets, but cuts also away some valid solutions
+  % not banishalid(Lid,Rid), % will stop everything ...
+  % not prassigned(Lid), % will stop everything 
   head(Rid,Hid), 
   arity(Hid,N), 
   pred(Hid,Pn). 
 
+prassigned(Lid) :- assigned(Lid,New). 
+
+fsame(Lid,Rid) :- fullsameext(Lid,Rid,New). 
+
+% Once we have assigned one 
+% we tag all Lists with same values 
+% as assigned as well. 
+assigned(Lid2,New) :- 
+  assigned(Lid,New),
+  fullsameint(Lid,Rid,Lid2). 
+
+% Get the external ones. 
+assigned(Lid2,New) :- 
+  assigned(Lid1,New),
+  fullsameext(Lid1,Rid,New), 
+  fullsameext(Lid2,Rid,New).
+
+
+
+
+banishalid(Lid2,Rid) :- 
+  goodassign(Lid1,Rid), 
+  samealids(Lid1,Rid,Vn,Lid2), 
+  not projectdiffalid(Lid1,Rid,Lid2). 
+
 4 { 
-  alist(New+1,N,New+N+A),
-  cnst(New+N+A,Val), % A or N?
+  % alist(New+1,N,New+N+A),
+  % cnst(New+N+A,Val), % A or N?
+  alist(New+1,N,New+1+N),
+  cnst(New+1+N,Val), % A or N?
   assert(New),
   arity(New+1,A)
 } 4
 :- 
-  newname(New,Lid,Ignore), 
+  newname(New,Lid,Ignore),    % we have two free IDs after New 
   goodassign(Lid,Rid),
   head(Rid,Hid), 
   arity(Hid,A), 
-  tstassign(Lid,Rid,Vn,Val), 
+  % tstassign(Lid,Rid,Vn,Val), 
+  visibleassign(Lid,Rid,Vn,Val), 
   alist(Hid,N,Vid), 
   var(Vid,Vn). 
 
