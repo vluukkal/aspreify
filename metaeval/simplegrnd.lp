@@ -470,11 +470,48 @@ fullsameint(Lid,Rid,Jid) :-
 
 
 % Make a closure of fullsameint's 
-fullsameint(Lid1,Rid,Lid3) :- 
-  onesameint(Lid1,Rid,Lid2,N1), 
-  onesameint(Lid2,Rid,Lid3,N2), 
+% We tag those which are not the 'smallest'
+% XXX SHouldn't this be fullsameint rather than 
+% onesameint?
+2 {
+fullsameint(Lid1,Rid,Lid3),
+subcluster(Lid2,Rid)
+} 2 :- 
+  % XXX onesameint(Lid1,Rid,Lid2,N1), 
+  % XXX onesameint(Lid2,Rid,Lid3,N2), 
+
+  fullsameint(Lid1,Rid,Lid2), 
+  fullsameint(Lid2,Rid,Lid3), 
+
   Lid1 < Lid3, % XXX 
-  not fulldiffint(Lid1,Rid,Lid3).
+  not fulldiffint(Lid1,Rid,Lid3),
+  not fullsameint(Lid3,Rid,Lid1).
+  %not fullsameint(Lid3,Rid,Tmp),
+  %nxt(Tmp).
+
+% We assume that the closure has been constructed. 
+% We have one 'main' cluster, which has more than one
+% Lid1s. It could only have been constructed tranistively 
+% so it is identified as the source of the closure.
+% In case our assumption is wrong, there are more than one 
+% cluster, this will not work...
+% This boils down to whether the previous rule works or not. 
+% Oddly, our subcluster thing does not work, why?
+pick(Lid,Rid) :- 
+  fullsameint(Lid,Rid,Lid2),     % The 'main' cluster
+  not subcluster(Lid,Rid),
+  fullsameint(Lid2,Rid,Lid3).
+  
+
+% Not much use for this?
+% This only picks the cases where there is one
+% in the cluster. 
+%picksmallestint(Lid1,Rid) :- 
+%  fullsameint(Lid1,Rid,Lid2),
+%  not fullsameint(Lid2,Rid,Lid3),
+%  nxt(Lid2), 
+%  nxt(Lid3), 
+%  Lid2 < Lid1. 
 
 
 % ---------------------
