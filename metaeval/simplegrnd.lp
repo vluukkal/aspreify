@@ -228,37 +228,6 @@ isinlist(L,M) :- litem(L, Rid, M, 0, 1).
 listlen(Listid,N) :- 
   litem(Listid,Rid, Mapid,Next,N). 
 
-
-% Now for any two singleton map(list)s put them to another list 
-%2 { 
-%  litem(@getctr(), Rid, Mapid1, Listid2, 2), 
-%  nxt(@nxtctr(1))
-%} 2 :- 
-%  % Three next lines are generic
-%  litem(Listid1,Rid,Mapid1,0,1),
-%  litem(Listid2,Rid,Mapid2,0,1),
-%  Mapid1 != Mapid2. 
-
-% We keep growing the lists, for any list of N-1,
-% we recombine it to a list of N. 
-% What if no N-1 available. 
-%2 { 
-%  litem(@getctr(), Rid,Mapid1, Listid2, N), 
-%  nxt(@nxtctr(1))
-%} 2 :- 
-  % Three next lines are generic
-%  litem(Listid1,Rid,Mapid1,0,1),
-%  litem(Listid2,Rid,Mapid2,Nxt2,N-1),
-  % Mapid1 != Mapid2, 
-%  not isinlist(Listid2,Mapid1),
-  % Now we make some constraints about the list 
-%  bodycount(Rid,N),       % only up to N 
-%  map(Mapid1,Rid,N1,_),   % must have same RID, maybe diferent N1,N2
-%  map(Mapid2,Rid,N2,_). 
-
-% We should be able to grow, or shrink, generate list items for N > 1 up to 
-% N. This would be kind of like starting a recursion up or down. 
-
 % Each inlist/4 of length bodycount/2 should now be evaluated 
 % to produce an OK wrt. the rules and produced variables. 
 % Potentials are those lists that have the same length
@@ -368,12 +337,14 @@ fulldiffext(Lid,Rid,Jid) :-
 %  assign(Lid,Rid,_,_),      % we have an assignment, but we ignore the values, could be a projection ...
 %  not fullsameext(Lid,Rid,Jid). 
 
-onesame(Lid,Rid,@getctr()) :- 
-  fullsameext(Lid,Rid,Jid). 
+% These are attempts to bring 'time' in sense of the current counter in 
+% the equivalence checking. 
+%onesame(Lid,Rid,@getctr()) :- 
+%  fullsameext(Lid,Rid,Jid). 
 
-novelext(Lid,Rid,@getctr()) :- 
-  assign(Lid,Rid,_,_), 
-  not onesame(Lid,Rid,@getctr()).
+%novelext(Lid,Rid,@getctr()) :- 
+%  assign(Lid,Rid,_,_), 
+%  not onesame(Lid,Rid,@getctr()).
 
 % Pick one of internal to be a representative
 %novelinternal(Lid1)
@@ -382,45 +353,49 @@ novelext(Lid,Rid,@getctr()) :-
 %  not novelinternal(Lid1).
 
 % We create a cluster of equivalent lists
-% Should we have a dictionary?
-4 {
-eqcluster(@getctr(), Lid1, Rid),
-eqcluster(@getctr(), Lid2, Rid),
-primus(@getctr(),Lid1), 
-nxt(@nxtctr(1))
-} 4 :- 
-  fullsameint(Lid1,Rid,Lid2), 
-  not prprimus(Lid2).        
-  % not prprimus(Lid1).        % This unsats
-  % not primus(X,Lid1),        % These two diverge 
-  % nxt(X).		       % ...
+% XXX 
+% This is not used, but left here as an attempt 
+% to create a new 'namespace' for equivalent lists.
+% XXX
+% 
+%4 {
+%eqcluster(@getctr(), Lid1, Rid),
+%eqcluster(@getctr(), Lid2, Rid),
+%primus(@getctr(),Lid1), 
+%nxt(@nxtctr(1))
+%} 4 :- 
+%  fullsameint(Lid1,Rid,Lid2), 
+%  not prprimus(Lid2).        
+%  % not prprimus(Lid1).        % This unsats
+%  % not primus(X,Lid1),        % These two diverge 
+%  % nxt(X).		       % ...
 
-prprimus(Lid) :- primus(X,Lid). 
+%prprimus(Lid) :- primus(X,Lid). 
 
-smallestsame(Lid1,Rid) :- 
-  fullsameint(Lid1,Rid,Lid2), 
-  fullsameint(Lid2,Rid,Lid3),
-  Lid1 < Lid3,
-  Lid1 < Lid2.
+%smallestsame(Lid1,Rid) :- 
+%  fullsameint(Lid1,Rid,Lid2), 
+%  fullsameint(Lid2,Rid,Lid3),
+%  Lid1 < Lid3,
+%  Lid1 < Lid2.
 
-largestsame(Lid3,Rid) :- 
-  fullsameint(Lid1,Rid,Lid2),
-  fullsameint(Lid2,Rid,Lid3),
-  Lid3 > Lid1,
-  Lid3 > Lid2.
+%largestsame(Lid3,Rid) :- 
+%  fullsameint(Lid1,Rid,Lid2),
+%  fullsameint(Lid2,Rid,Lid3),
+%  Lid3 > Lid1,
+%  Lid3 > Lid2.
 
 % Now try to attach other equivalent ones to this cluster 
-eqcluster(X,LidSame,Rid) :- 
-  primus(X,Lid),
-  fullsameint(Lid,Rid,LidSame). 
+%eqcluster(X,LidSame,Rid) :- 
+%  primus(X,Lid),
+%  fullsameint(Lid,Rid,LidSame). 
 
 % Clusters of same values may be built on different 
 % primuses. 
-samecluster(C1,C2) :- 
-  primus(C1,Lid1), 
-  primus(C2,Lid2), 
-  not samecluster(C2,C1), 
-  fullsameint(Lid1,Rid,Lid2).
+%samecluster(C1,C2) :- 
+%  primus(C1,Lid1), 
+%  primus(C2,Lid2), 
+%  not samecluster(C2,C1), 
+%  fullsameint(Lid1,Rid,Lid2).
 
 
 % This does not pertain to predicates with more than one argument
@@ -459,15 +434,35 @@ fulldiffint(Lid1,Rid,Lid2) :-
 % This does not pertain to predicates with more than one argument
 fullsameint(Lid1,Rid,Lid2) :- 
   onesameint(Lid1,Rid,Lid2,N1), 
-  Lid1 < Lid2, % XXX 
+  % goodassign(Lid1,Rid), % XXX kills all new facts 
+  Lid1 < Lid2,
   not fulldiffint(Lid1,Rid,Lid2).
 
+% Tag the leading argument of a fullsameint cluster 
+% with justified/2 if there is one goodassign in the cluster
+% The first term is the equivalence ID, second is the 
+% justifying predicate. 
+justified(Lid1,Lid1) :- 
+  onesameint(Lid1,Rid,Lid2,N1),
+  goodassign(Lid1,Rid). 
+justified(Lid1,Lid2) :- 
+  onesameint(Lid1,Rid,Lid2,N1),
+  goodassign(Lid2,Rid). 
+
+
+
 % For cases with one argument
-fullsameint(Lid,Rid,Jid) :- 
+% This seems to be precisely as the general case...
+% However since there is only one of these, we at the 
+% same time pick the internal one. 
+2 {
+  fullsameint(Lid,Rid,Jid), 
+  pickinternal(Lid,Rid) 
+} 2 :- 
   head(Rid,Hid), 
   arity(Hid,1), 
-  onesameint(Lid,Rid,Jid,N). 
-
+  onesameint(Lid,Rid,Jid,N),
+  Lid < Jid.
 
 % Make a closure of fullsameint's 
 % We tag those which are not the 'smallest'
@@ -477,13 +472,11 @@ fullsameint(Lid,Rid,Jid) :-
 fullsameint(Lid1,Rid,Lid3),
 subcluster(Lid2,Rid)
 } 2 :- 
-  % XXX onesameint(Lid1,Rid,Lid2,N1), 
-  % XXX onesameint(Lid2,Rid,Lid3,N2), 
-
   fullsameint(Lid1,Rid,Lid2), 
   fullsameint(Lid2,Rid,Lid3), 
 
-  Lid1 < Lid3, % XXX 
+  Lid1 < Lid3,
+  % goodassign(Lid1,Rid),    % XXX
   not fulldiffint(Lid1,Rid,Lid3),
   not fullsameint(Lid3,Rid,Lid1).
   %not fullsameint(Lid3,Rid,Tmp),
@@ -491,27 +484,23 @@ subcluster(Lid2,Rid)
 
 % We assume that the closure has been constructed. 
 % We have one 'main' cluster, which has more than one
-% Lid1s. It could only have been constructed tranistively 
+% Lid1s. It could only have been constructed transitively 
 % so it is identified as the source of the closure.
-% In case our assumption is wrong, there are more than one 
-% cluster, this will not work...
-% This boils down to whether the previous rule works or not. 
-% Oddly, our subcluster thing does not work, why?
-pick(Lid,Rid) :- 
-  fullsameint(Lid,Rid,Lid2),     % The 'main' cluster
-  not subcluster(Lid,Rid),
-  fullsameint(Lid2,Rid,Lid3).
-  
+% The first term of fullsameint/3 is the key or identity of
+% the cluster and all but the 'main' cluster have been 
+% tagged with subcluster/2 by comparison. 
 
-% Not much use for this?
-% This only picks the cases where there is one
-% in the cluster. 
-%picksmallestint(Lid1,Rid) :- 
-%  fullsameint(Lid1,Rid,Lid2),
-%  not fullsameint(Lid2,Rid,Lid3),
-%  nxt(Lid2), 
-%  nxt(Lid3), 
-%  Lid2 < Lid1. 
+%pickinternal(Lid,Rid) :- 
+%  fullsameint(Lid,Rid,Lid2),     % The 'main' cluster
+%  not subcluster(Lid,Rid),
+%  fullsameint(Lid2,Rid,Lid3).
+
+pickinternal(Lid,Rid) :- 
+  fullsameint(Lid1,Rid,Lid2),     % The 'main' cluster, identified by Lid1
+  not subcluster(Lid1,Rid),
+  justified(Lid1,Lid),            % There must be a justified/2 tagged entry associated with Lid1
+  fullsameint(Lid2,Rid,Lid3).
+
 
 
 % ---------------------
@@ -688,11 +677,12 @@ projectsameground(Rid,Lid) :- samelistground(Rid,Lid,Aid).
 %  projectdiff(Lid,Rid,Aid),
 %  not projectsameground(Rid,Lid). 
 
-goodassign(Lid,Rid) :-  
-  not fsame(Lid,Rid), % XXX
-  not prassigned(Lid), 
-  projectdiff(Lid,Rid,Aid),
-  not badassign(Lid,Rid).
+% Mod 1 
+%goodassign(Lid,Rid) :-  
+%  not fsame(Lid,Rid), % XXX
+%  not prassigned(Lid), 
+%  projectdiff(Lid,Rid,Aid),
+%  not badassign(Lid,Rid).
 
 % Do we have two assignments with different values to the same variable name 
 badassign(Lid,Rid) :- 
@@ -704,7 +694,7 @@ iststassigned(Lid,Rid,Vn) :-   tstassign(Lid,Rid,Vn,Val1).
 
 badassign(Lid,Rid) :- 
   potential(Rid,Lid), 
-  headvarval(Rid,Pn,N,Vn,X1,X2),
+  headvoarval(Rid,Pn,N,Vn,X1,X2),
   not iststassigned(Lid,Rid,Vn).
 
 % What case does this cover? If this is not here no multiple arguments
@@ -722,34 +712,40 @@ goodassign(Lid,Rid) :-
 
 
 % Each time we create a new 
-2 {
-  nxtassign(@getctr(), Lid, Rid), 
-  nxt(@nxtctr(1))
-} 2 :- 
-  % not prassigned(Lid), 
-  visibleassign(Lid,Rid,Vn,Val), 
-  not badassign(Lid,Rid). 
+%2 {
+%  nxtassign(@getctr(), Lid, Rid), 
+% nxt(@nxtctr(1))
+%} 2 :- 
+%  % not prassigned(Lid), 
+%  visibleassign(Lid,Rid,Vn,Val), 
+%  not badassign(Lid,Rid). 
   
 
-% For any good assignment we make a new head
-%8 {   
-%  hasrule(1,@getctr()), 
-%  newname(@getctr(),Lid,"JOPI"), 
-%  newpotfact(@getctr(), Rid), 
-%  head(@getctr(),@getctr()+1), 
-%  pos(@getctr()+1), 
-%  pred(@getctr() + 1, Pn ),
-%  assigned(Lid,@getctr()), 
-%  nxt(@nxtctr(N+2))
-%} 8 :- 
-oink :- % XXX 
-  goodassign(Lid,Rid),
+% For any good assignment that has been picked from the internal 
+% candidates we make a new head. 
+8 {   
+  hasrule(1,@getctr()), 
+  newname(@getctr(),Lid,"JOPI"), 
+  newpotfact(@getctr(), Rid), 
+  head(@getctr(),@getctr()+1), 
+  pos(@getctr()+1), 
+  pred(@getctr() + 1, Pn ),
+  assigned(Lid,@getctr()), 
+  nxt(@nxtctr(N+2))
+} 8 :- 
+% oink :- % XXX 
+  % goodassign(Lid,Rid), % XXX 28. maybe this is not needed 
+  pickinternal(Lid,Rid), 
   % not projectreallysame(Lid,Rid), % will generate a large amount of answer sets, but cuts also away some valid solutions
   % not banishalid(Lid,Rid), % will stop everything ...
   % not prassigned(Lid), % will stop everything 
   head(Rid,Hid), 
   arity(Hid,N), 
   pred(Hid,Pn). 
+
+pickedandgood(Lid,Rid) :- 
+  goodassign(Lid,Rid),
+  pickinternal(Lid,Rid).
 
 prassigned(Lid) :- assigned(Lid,New). 
 
@@ -770,11 +766,12 @@ assigned(Lid2,New) :-
 
 
 
-
-banishalid(Lid2,Rid) :- 
-  goodassign(Lid1,Rid), 
-  samealids(Lid1,Rid,Vn,Lid2), 
-  not projectdiffalid(Lid1,Rid,Lid2). 
+% An attempt to exclude some alids, may be needed when dealing
+% with external conflicts. 
+%banishalid(Lid2,Rid) :- 
+%  goodassign(Lid1,Rid), 
+%  samealids(Lid1,Rid,Vn,Lid2), 
+%  not projectdiffalid(Lid1,Rid,Lid2). 
 
 4 { 
   % alist(New+1,N,New+N+A),
@@ -786,7 +783,8 @@ banishalid(Lid2,Rid) :-
 } 4
 :- 
   newname(New,Lid,Ignore),    % we have two free IDs after New 
-  goodassign(Lid,Rid),
+  % goodassign(Lid,Rid),
+  pickinternal(Lid,Rid), 
   head(Rid,Hid), 
   arity(Hid,A), 
   % tstassign(Lid,Rid,Vn,Val), 
