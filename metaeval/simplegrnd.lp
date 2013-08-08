@@ -397,11 +397,14 @@ fulldiffext(Lid,Rid,Jid) :-
 %  not samecluster(C2,C1), 
 %  fullsameint(Lid1,Rid,Lid2).
 
+%fse(Lid,Rid,Jid,@getctr()) :- fullsameext(Lid,Rid,Jid).
+
+%tassert(Jid,@getctr()) :- assert(Jid). 
 
 % This does not pertain to predicates with more than one argument
 fullsameext(Lid,Rid,Jid) :- 
   onesameext(Lid,Rid,Jid,N1), 
-  assert(Jid2), 
+  assert(Jid), 
   not fulldiffext(Lid,Rid,Jid).
 
 % For cases with one argument
@@ -500,6 +503,38 @@ pickinternal(Lid,Rid) :-
   not subcluster(Lid1,Rid),
   justified(Lid1,Lid),            % There must be a justified/2 tagged entry associated with Lid1
   fullsameint(Lid2,Rid,Lid3).
+
+
+% pickexternal(Lid,Rid) :- 
+foo :- 
+  fullsameint(Lid1,Rid,Lid2),     % The 'main' cluster, identified by Lid1
+  not subcluster(Lid1,Rid),
+  justified(Lid1,Lid),            % There must be a justified/2 tagged entry associated with Lid1
+  % and now check the tags 
+  Jid > Lid, 
+  not fullsameext(Lid,Rid,Jid),
+  assert(Jid).
+
+pickexternal(Lid1,Rid) :- 
+  fullsameint(Lid1,Rid,Lid2),
+  not deny(Lid1,Rid).
+
+goodorder(Lid,Rid,Aid) :- 
+    assert(Aid), 
+    fullsameext(Lid,Rid,Aid),
+    Aid > Lid. 
+
+deny(Lid,Rid) :- 
+    assert(Jid),
+    fullsameext(Lid,Rid,Jid),
+    not goodorder(Lid,Rid,Jid). 
+
+
+% Is something that is same still free?
+%unused(Lid,Rid,Jid) :- 
+%  fullsameext(Lid,Rid,Jid), 
+%  not prassigned(Lid).
+
 
 
 
@@ -694,7 +729,7 @@ iststassigned(Lid,Rid,Vn) :-   tstassign(Lid,Rid,Vn,Val1).
 
 badassign(Lid,Rid) :- 
   potential(Rid,Lid), 
-  headvoarval(Rid,Pn,N,Vn,X1,X2),
+  headvarval(Rid,Pn,N,Vn,X1,X2),
   not iststassigned(Lid,Rid,Vn).
 
 % What case does this cover? If this is not here no multiple arguments
@@ -723,7 +758,7 @@ goodassign(Lid,Rid) :-
 
 % For any good assignment that has been picked from the internal 
 % candidates we make a new head. 
-8 {   
+9 {   
   hasrule(1,@getctr()), 
   newname(@getctr(),Lid,"JOPI"), 
   newpotfact(@getctr(), Rid), 
@@ -731,11 +766,13 @@ goodassign(Lid,Rid) :-
   pos(@getctr()+1), 
   pred(@getctr() + 1, Pn ),
   assigned(Lid,@getctr()), 
+  fse2(Lid,Rid,@getctr()), 
   nxt(@nxtctr(N+2))
-} 8 :- 
+} 9 :- 
 % oink :- % XXX 
   % goodassign(Lid,Rid), % XXX 28. maybe this is not needed 
   pickinternal(Lid,Rid), 
+  pickexternal(Lid,Rid), 
   % not projectreallysame(Lid,Rid), % will generate a large amount of answer sets, but cuts also away some valid solutions
   % not banishalid(Lid,Rid), % will stop everything ...
   % not prassigned(Lid), % will stop everything 
@@ -749,7 +786,7 @@ pickedandgood(Lid,Rid) :-
 
 prassigned(Lid) :- assigned(Lid,New). 
 
-fsame(Lid,Rid) :- fullsameext(Lid,Rid,New). 
+% fsame(Lid,Rid) :- fullsameext(Lid,Rid,New). 
 
 % Once we have assigned one 
 % we tag all Lists with same values 
