@@ -88,6 +88,127 @@ txtcomment t =
   let newl = List.map (\x -> "% " ++ x ) l in 
   unlines newl
 
+-- The arity of the head as a string. 
+-- For now it is zero for anything else than plain body. 
+getheadarity :: Body -> Int
+getheadarity b = 
+  case b of 
+    Plain n a nonneg -> List.length a
+    _ -> 0
+
+-- We create the head of a skeleton based on the arity of the 
+-- reified head. 
+-- skeleton8(Rid, Jid1, Jid2)
+mkskeletonhead :: String -> String -> Int -> String 
+mkskeletonhead nm vn arity = 
+  let nms = enumFromTo 1 arity in 
+  let jids = map (\i -> vn ++ show(i)) nms in 
+  let args = concat $ List.intersperse "," ("Rid":jids) in 
+    nm ++ "(" ++ args ++ ")"
+  
+mkskeletoncommon :: Integer -> String 
+mkskeletoncommon n =
+ "  rule(Rid),\n  Rid == " ++ show(n) ++ ",\n"
+
+mkrulemaps :: Int -> String 
+mkrulemaps arity = 
+  let nms = enumFromTo 1 arity in 
+  let bds = map (\i -> "  onerulemap(Rid, Bidx" ++ show(i) ++ ",Predid" ++ show(i) ++ ",Jid" ++ show(i) ++ ",One"  ++ show(i) ++ ")") nms in 
+  let bodies = concat $ List.intersperse ",\n" bds in 
+    bodies
+  
+mkconsistentassignments arity =
+  let nms = enumFromTo 1 (arity - 1) in 
+  let bds = map (\i -> "  consistentassignments(Rid,Bidx" ++ show(i) ++ ",Jid" ++ show(i) ++ ",Bidx" ++ show(i+1) ++ ",Jid"  ++ show(i+1) ++ ")") nms in 
+  let bodies = concat $ List.intersperse ",\n" bds in 
+    bodies
+
+
+justskeleton :: Body -> Integer -> String 
+justskeleton b ruleid = 
+  let arity = getheadarity b in 
+  let nm = "skeleton" ++ show(ruleid) in 
+  let hd = mkskeletonhead nm "Jid" arity in 
+  let common = mkskeletoncommon ruleid in 
+  let rulemaps = mkrulemaps arity in 
+  let consistency = mkconsistentassignments arity in 
+    hd ++ ":-\n" ++ common ++ (if consistency == "" then (rulemaps ++ ".\n") else rulemaps ++ ",\n" ++ consistency ++ ".\n")
+
+mkheadvarstr i = 
+   let one = "  headvarval(Rid,Pn,Idx" ++ show(i) ++ ",Vn" ++ show(i) ++ ",Bidx" ++ show(i) ++ ",Pos"  ++ show(i) ++ "),\n" in 
+   let two = "  Idx" ++ show(i) ++ " == " ++ show(i) ++ ",\n" in 
+   let three = "  alist(Jid" ++ show(i) ++ ",Pos" ++ show(i) ++ ",Vid" ++ show(i) ++ "),\n" in 
+   let four = "  cnst(Vid" ++ show(i) ++ ",Val" ++ show(i) ++ ")" in 
+     one ++ two ++ three ++ four 
+
+mkheadvarval arity =
+  let nms = enumFromTo 1 arity in 
+  -- let bds = map (\i -> "  headvarval(Rid,Pn,Idx" ++ show(i) ++ ",Vn" ++ show(i) ++ ",Bidx" ++ show(i) ++ ",Pos"  ++ show(i) ++ ")") nms in 
+  let bds = map mkheadvarstr nms in 
+  let bodies = concat $ List.intersperse ",\n" bds in 
+    bodies
+
+mkskeletonfinal :: Integer -> Int -> String 
+mkskeletonfinal ruleid arity = 
+  let nm = "skeletonfinal" ++ show(ruleid) in 
+  let hd = mkskeletonhead nm "Val" arity in 
+  let link = mkskeletonhead ("skeleton" ++ show(ruleid)) "Jid" arity in 
+  let final = mkheadvarval arity in 
+    hd ++ ":-\n  " ++ link ++ ",\n" ++ final ++ ".\n"
+
+mkskeletonassert :: Integer -> Int -> String -> String 
+mkskeletonassert ruleid arity firstarg = 
+  let nm = ("skeletonassert" ++ show(ruleid)) in 
+  let nms = enumFromTo 1 arity in 
+  let jids = map (\i -> "V" ++ show(i)) nms in 
+  let args = concat $ List.intersperse "," (firstarg:"Rid":jids) in 
+    nm ++ "(" ++ args ++ ")"
+
+mkskeletonderivers hd ruleid arity = 
+  let bd = mkskeletonassert ruleid arity "NF" in bd 
+
+mkalistderivers ruleid arity = 
+  let nms = enumFromTo 1 arity in 
+  let ids = map (\i -> "alist(NF+1," ++ show(i) ++ ",NF+" ++ show(i) ++ "+1) :-" ++ (mkskeletonderivers "XXX" ruleid arity) ) nms in 
+  let res = concat $ List.intersperse ".\n" (ids) in 
+  res
+
+mkcnstderivers ruleid arity = 
+  let nms = enumFromTo 1 arity in 
+  let ids = map (\i -> "cnst(NF+" ++ show(i) ++ "+1,V" ++ show(i) ++ ") :-" ++ (mkskeletonderivers "XXX" ruleid arity) ) nms in 
+  let res = concat $ List.intersperse ".\n" (ids) in 
+  res
+
+  
+
+mkskeletoncreator :: Integer -> Int -> String 
+mkskeletoncreator ruleid arity = 
+  let ctrname = "@nxtctr(N+3)" in 
+  let hd = mkskeletonassert ruleid arity ctrname in 
+  let final = mkskeletonhead ("skeletonfinal" ++ show(ruleid)) "V" arity in 
+  let one = "  Rid == " ++ show(ruleid) in 
+  let two = "  head(Rid,Hid)" in 
+  let three = "  arity(Hid,N)" in 
+  hd ++ ":-\n  " ++ final ++ ",\n" ++ one ++ ",\n" ++ two ++ ",\n" ++ three ++ ".\n"
+
+mkskeletons :: Body -> Integer -> String 
+mkskeletons b ruleid = 
+  let arity = (getheadarity b) in 
+  let justified = justskeleton b ruleid in 
+  let final = mkskeletonfinal ruleid arity in 
+  let creator = mkskeletoncreator ruleid arity in 
+  let d1 = "hasrule(1,NF) :- " ++ (mkskeletonderivers "" ruleid arity) in 
+  let d2 = "pos(NF+1) :- " ++ (mkskeletonderivers "" ruleid arity) in 
+  let d3 = "newname(NF,\"JOPI\") :- " ++ (mkskeletonderivers "" ruleid arity) in 
+  let d4 = "head(NF,NF+1) :- " ++ (mkskeletonderivers "" ruleid arity) in 
+  let d5 = ("pred(NF+1,Pn) :- " ++ (mkskeletonderivers "" ruleid arity) ++ ",\n  head(Rid,Hid),\n  pred(Hid,Pn)" ) in 
+  let alistd = mkalistderivers ruleid arity in 
+  let cnstd = mkcnstderivers ruleid arity in 
+  let d6 = ("arity(NF+1,A) :- " ++ (mkskeletonderivers "" ruleid arity) ++ ",\n  head(Rid,Hid),\n  arity(Hid,A)" ) in 
+  let d7 = "assert(NF) :- " ++ (mkskeletonderivers "" ruleid arity) in 
+  "\n" ++ justified ++ "\n" ++ final ++ "\n" ++ creator ++ (concat $ List.intersperse ".\n" [d1,d2,d3,d4,d5,alistd,cnstd,d6,d7]) ++ ".\n\n"
+
+
 -- This one will have its own "namespace", that is it may be 
 -- that variables with same lexical name should have same ID. 
 factitem :: Show a => a -> IO Integer -> Rules -> [Char] -> [Char]
@@ -97,7 +218,9 @@ factitem fid ctr i accu =
     -- let ruleid = (unsafectr())::Int in 
     -- let ruleid = (id + 1) in 
     let ruleid = FactRender.getnext(ctr)::Integer in 
-    let bidx = FactRender.unsafectr() in 
+
+    -- let bidx = FactRender.unsafectr in 
+    let bidx = 1 in 
     -- let bidx = FactRender.getnext(0)::Integer in 
 
     -- let preflink = show(id) ++ ",http://m3.org/rls#partof," ++ show(ruleid) ++ "\n" in 
@@ -107,24 +230,46 @@ factitem fid ctr i accu =
     case i of
       Rule b l -> 
                   let numbodies = show(List.length l) in 
-                  accu ++ ctext ++ preflink ++ 
-                  "rule(" ++ show(ruleid) ++ ")." ++ "\n" ++
-                  "bodycount(" ++ show(ruleid) ++ "," ++ numbodies ++  ")." ++ "\n" ++
-                  -- head(factbody "head" ruleid b []) ++ 
-                  head(factbody "" ruleid ruleid ctr (bidx,True) b []) ++ 
-                  (List.foldr (++) "" (List.foldr (factbody "body" ruleid ruleid ctr (bidx,True)) [] l)) 
+                  let (tmplst,_) = factbody "" ruleid ruleid ctr (bidx,False) (b,bidx) ([],0) in 
+                  let hdlst = head(tmplst) in 
+                  -- let (bodylst,ctr) = (List.foldr (++) "" (List.foldr (factbody "body" ruleid ruleid ctr (bidx,True)) ([],0) (l,bidx))) in 
+                  -- Make l amenable for this 
+                  let l' = List.zip l [1..toInteger(List.length(l))] in 
+                  let (tmplst',ctr') = (List.foldr (factbody "body" ruleid ruleid ctr (bidx,True)) ([],0) l') in 
+                  -- let (bodylst,ctr) = (List.foldr (++) "" (List.foldr (factbody "body" ruleid ruleid ctr (bidx,True)) ([],0) (l,bidx))) in 
+                  let bodylst = (List.foldr (++) "" tmplst') in 
+                  let resultstr = accu ++ ctext ++ preflink ++ 
+                                  "rule(" ++ show(ruleid) ++ ")." ++ "\n" ++
+                                  "bodycount(" ++ show(ruleid) ++ "," ++ numbodies ++  ")." ++ "\n" ++
+                                  -- head(factbody "" ruleid ruleid ctr (bidx,True) b []) ++ 
+                                  hdlst ++ 
+                                  -- (List.foldr (++) "" (List.foldr (factbody "body" ruleid ruleid ctr (bidx,True)) [] l)) 
+                                  bodylst in 
+                 let meta = mkskeletons b ruleid in 
+                 resultstr ++ meta 
                  -- "" 
       Deny l ->
                 let numbodies = show(List.length l) in 
-                 accu ++ ctext ++ preflink ++ 
+                -- let bodylst = (List.foldr (++) "" (List.foldr (factbody "body" ruleid ruleid ctr (bidx,True) ) [] l)) in 
+                let l' = List.zip l [1..toInteger(List.length(l))] in 
+                let (tmplst',ctr') = (List.foldr (factbody "body" ruleid ruleid ctr (bidx,True)) ([],0) l') in 
+                let bodylst = (List.foldr (++) "" tmplst') in 
+                accu ++ ctext ++ preflink ++ 
                 "constraint(" ++ show(ruleid) ++ ")." ++ "\n" ++
                 "bodycount(" ++ show(ruleid) ++ "," ++ numbodies ++  ")." ++ "\n" ++
-                (List.foldr (++) "" (List.foldr (factbody "body" ruleid ruleid ctr (bidx,True) ) [] l))
+                -- (List.foldr (++) "" (List.foldr (factbody "body" ruleid ruleid ctr (bidx,True) ) [] l))
+                bodylst
                 -- ++ 
                 -- ""
-      Fact l -> accu ++ ctext ++ preflink ++ 
+      Fact l -> 
+                let l' = List.zip l [1..toInteger(List.length(l))] in 
+                let (tmplst',ctr') = (List.foldr (factbody "head" ruleid ruleid ctr (bidx,False)) ([],0) l') in 
+                let bodylst = (List.foldr (++) "" tmplst') in 
+                -- let bodylst = (List.foldr (++) "" (List.foldr (factbody "head" ruleid ruleid ctr (bidx,False)) [] l)) in 
+                accu ++ ctext ++ preflink ++ 
                 "assert(" ++ show(ruleid) ++ ")." ++ "\n" ++
-                (List.foldr (++) "" (List.foldr (factbody "head" ruleid ruleid ctr (bidx,True)) [] l))
+                -- (List.foldr (++) "" (List.foldr (factbody "head" ruleid ruleid ctr (bidx,True)) [] l))
+                bodylst
                 -- ++ 
                 -- ""
       Show _ -> accu 
@@ -138,45 +283,34 @@ factitem fid ctr i accu =
       RComment _ -> accu 
       Computes _ _ -> accu 
       Emptyset -> accu 
-      Consts l -> accu ++ ctext ++ cnstlink ++ 
-                  "constdef(" ++ show(ruleid) ++ ")." ++ "\n" ++
-                  (List.foldr (++) "" (List.foldr (factbody "" ruleid ruleid ctr (bidx,True)) [] l))
-
-{--
--- factcard :: [Char] -> Int -> IO Int -> Body -> [[Char]] -> [[Char]]
-factcard :: [Char] -> Integer -> Integer -> IO Integer -> Body -> [[Char]] -> [[Char]]
-factcard rel ruleid parentid ctr r accu = 
-   let previd = 0 in 
-   let newaccu = (accu ++ ["tlist''(" ++ show(parentid) ++ "," ++ show(previd) ++ "," ++ "jop" ++ ").\n" ] ++ (factbody "type" ruleid parentid ctr r accu)) 
-   -- in (newaccu, (previd+1))
-      in newaccu 
---}
+      Consts l -> 
+                  let l' = List.zip l [1..toInteger(List.length(l))] in 
+                  let (tmplst',ctr') = (List.foldr (factbody "body" ruleid ruleid ctr (bidx,False)) ([],0) l') in 
+                  let bodylst = (List.foldr (++) "" tmplst') in 
+                  accu ++ ctext ++ cnstlink ++ 
+                  "constdef(" ++ show(ruleid) ++ ")." ++ "\n" ++ bodylst 
+                  -- (List.foldr (++) "" (List.foldr (factbody "" ruleid ruleid ctr (bidx,True)) [] l))
 
 --- A wrapper around factbody, keeping track of the 
 --- items in a typed or qualified list. 
-factcard' :: [Char] -> Integer -> Integer -> IO Integer -> (IO Integer, Bool) -> Body -> ([[Char]], Int) -> ([[Char]], Int)
+factcard' :: [Char] -> Integer -> Integer -> IO Integer -> (Integer, Bool) -> Body -> ([[Char]], Int) -> ([[Char]], Int)
 factcard' relstr ruleid parentid ctr (idx,useidx) r (accu, previd) = 
-   -- let nxt = 0 in 
-   --- let newaccu = (accu ++ ["tlist(" ++ show(parentid) ++ "," ++ show(previd) ++ "," ++ show(nxt) ++ ").\n" ] ++ (factbody "type" parentid ctr r accu)) 
-   -- let newaccu = (accu ++ (factbody "typed" parentid ctr r accu)) 
-   -- let newaccu = (accu ++ (factbody rel parentid ctr r accu)) 
-   let accu' = (if useidx then let bidx = FactRender.getnext(idx) in accu ++ ["bodylist(" ++ show(parentid) ++ "," ++ show(bidx) ++ "," ++ show(previd) ++ ").\n"] else accu) in 
-   let newaccu = (factbody relstr ruleid parentid ctr (idx,useidx) r accu')
-   -- let newaccu = tmp ++ ["tlist'(" ++ show(parentid) ++ "," ++ show(previd) ++ "," ++ show(nxt) ++ ").\n" ] 
+   let accu' = (if useidx then let bidx = idx in accu ++ ["bodylist(" ++ show(parentid) ++ "," ++ show(bidx) ++ "," ++ show(previd) ++ ").\n"] else accu) in 
+   let (newaccu,ctr') = factbody relstr ruleid parentid ctr (idx,False) (r,0) (accu',0)
+   -- let newaccu = (factbody relstr ruleid parentid ctr (idx,useidx) r accu')
    in (newaccu, (previd+1))
    --   in newaccu 
 
 --- A wrapper around factbody, keeping track of the 
 --- items in a typed or qualified list. 
--- factcard' :: [Char] -> Int -> IO Int -> Body -> ([[Char]], Int) -> ([[Char]], Int)
-factcount :: [Char] -> Integer -> Integer -> IO Integer -> (IO Integer, Bool) -> Body -> ([[Char]], Int) -> ([[Char]], Int)
+factcount :: [Char] -> Integer -> Integer -> IO Integer -> (Integer, Bool) -> Body -> ([[Char]], Int) -> ([[Char]], Int)
 factcount relstr ruleid parentid ctr (idx,useidx) r (accu, previd) = 
    -- let nxt = 0 in 
-   let accu' = (if useidx then let bidx = FactRender.getnext(idx) in accu ++ ["bodylist(" ++ show(parentid) ++ "," ++ show(bidx) ++ "," ++ show(previd) ++ ").\n"] else accu) in 
-   --- let newaccu = (accu ++ ["tlist(" ++ show(parentid) ++ "," ++ show(previd) ++ "," ++ show(nxt) ++ ").\n" ] ++ (factbody "type" parentid ctr r accu)) 
-   -- let newaccu = (accu ++ (factbody "typed" parentid ctr r accu)) 
-   -- let newaccu = (accu ++ (factbody rel parentid ctr r accu)) 
-   let newaccu = (factbody relstr ruleid parentid ctr (idx,useidx) r accu')
+   let accu' = (if useidx then let bidx = idx in accu ++ ["bodylist(" ++ show(parentid) ++ "," ++ show(bidx) ++ "," ++ show(previd) ++ ").\n"] else accu) in 
+   let (newaccu,ctr') = factbody relstr ruleid parentid ctr (idx,False) (r,0) (accu',0)
+
+   -- let newaccu = (factbody relstr ruleid parentid ctr (idx,useidx) r accu')
+
    -- let newaccu = tmp ++ ["tlist'(" ++ show(parentid) ++ "," ++ show(previd) ++ "," ++ show(nxt) ++ ").\n" ] 
    in (newaccu, (previd+1))
    --   in newaccu 
@@ -188,160 +322,154 @@ factcount relstr ruleid parentid ctr (idx,useidx) r (accu, previd) =
 -- but now we cheat and do it like this:
 
 -- factbody :: [Char] -> Int -> IO Int -> Body -> [[Char]] -> [[Char]]
-factbody :: [Char] -> Integer -> Integer -> IO Integer -> (IO Integer, Bool) -> Body -> [[Char]] -> [[Char]]
+factbody :: [Char] -> Integer -> Integer -> IO Integer -> (Integer, Bool) -> (Body,Integer) -> ([[Char]],Integer) -> ([[Char]], Integer)
 -- factbody rel ruleid parentid ctr r accu = 
-factbody relstr ruleid parentid ctr (idx,useidx) r accu = 
+factbody relstr ruleid parentid ctr (oidx,useidx) (r,idx) (accu,bodyidx) = 
   -- let factid = (myrand())::Int in 
   -- let factid = (parentid+1) in 
   let factid = FactRender.getnext(ctr) in 
   -- bidx is the index of the body, we advance it only if this is a toplevel construct,
   -- that is, a fact. It may be that cardinals and others call us and they are expected 
   -- to have handled this. 
-  let (accu',bidx') = (if useidx then let bidx = FactRender.getnext(idx) in (accu ++ ["bodylist(" ++ show(parentid) ++ "," ++ show(bidx) ++ "," ++ show(factid) ++ ").\n"], idx) else (accu,idx)) in 
+  let (accu',bidx') = (if useidx then let bidx = idx in (accu ++ ["bodylist(" ++ show(parentid) ++ "," ++ show(bidx) ++ "," ++ show(factid) ++ ").\n"], (idx+1)) else (accu,idx)) in 
   case r of
     Plain n a nonneg -> let myrel = (if relstr == "" then "head" else relstr)
                         in 
                         -- let embed = (myrand())::Int in 
                          -- let embed = FactRender.getnext(ctr) in 
                          let arity = show(List.length a) in 
-                        accu' ++ 
-                        [
-                          (if nonneg then ("pos(" ++ show(factid) ++ ").\n")
-                           else ("neg(" ++ show(factid) ++ ").\n")) ++ 
-                          myrel ++ "(" ++ show(parentid) ++ "," ++ show(factid) ++ ")." ++ "\n" ++
-                          "rulepred(" ++ show(parentid) ++ "," ++ show(factid) ++ ")." ++ "\n" ++ 
-                          "arity(" ++ show(factid) ++ "," ++ arity ++ ")." ++ "\n" ++ 
-                          "pred(" ++ show(factid) ++ "," ++ show(unatom(n)) ++ ")." ++ "\n" ++
-                          --- "fact" ++ show(factid) ++ ",http://m3.org/rls#name," ++ 
-                          --- show(unatom(n)) ++ "\n" ++ 
-                        factargs ruleid factid a ctr]
+                         let ln0 = (if nonneg then ("pos(" ++ show(factid) ++ ").\n") else ("neg(" ++ show(factid) ++ ").\n")) in 
+                         let ln1 = ln0 ++ myrel ++ "(" ++ show(parentid) ++ "," ++ show(factid) ++ ")." ++ "\n" in 
+                         let ln2 = ln1 ++ "rulepred(" ++ show(parentid) ++ "," ++ show(factid) ++ ")." ++ "\n" in 
+                         let ln3 = ln2 ++ "arity(" ++ show(factid) ++ "," ++ arity ++ ")." ++ "\n" in 
+                         let ln4 = ln3 ++ "pred(" ++ show(factid) ++ "," ++ show(unatom(n)) ++ ")." ++ "\n" in 
+                         let ln5 = ln4 ++ factargs ruleid factid a ctr in 
+                         let resaccu = accu' ++ [ln5] in 
+                        (resaccu,bidx')
     Card minv maxv b nonneg -> let myrel = (if relstr == "" then "head" else relstr)
                         in 
-                          accu' ++ --- ["YYYCard\n"] ++ 
-                       [(if nonneg then "" else ("neg(" ++ show(factid) ++ ").\n")) ++ 
-                         myrel ++ "(" ++ show(parentid) ++ "," ++ show(factid) ++ ").\n" ++
-                         "card(" ++ show(factid) ++ ").\n" ++ 
-                        (List.foldr (++) "" 
-                         -- (let content = (foldr (factbody "body" factid ctr) [] b) in content)) ++
-                         (let (content,localid) = (List.foldr (factcard' "body" ruleid factid ctr (bidx',False)) ([],0) b) in content)) 
-                        ++ 
-                        (-- let minexprid = (myrand())::Int in 
-                         let minexprid = FactRender.getnext(ctr) in  
-                         if minv == (Sym (Const "any")) then "" else 
-                             "mincard(" ++ show(factid) ++ "," ++ show(minexprid) ++ ").\n" ++ 
-                                       (unfactmyexpr minv ruleid minexprid ctr)) ++
-                        (-- let maxexprid = (myrand())::Int in 
-                          let maxexprid = FactRender.getnext(ctr) in  
-                         if maxv == (Sym (Const "any")) then "" else 
-                             "maxcard(" ++ show(factid) ++ "," ++  show(maxexprid) ++ ").\n" ++ 
-                                       (unfactmyexpr maxv ruleid maxexprid ctr))
-                       ]
+                          -- let resaccu = accu' ++ --- ["YYYCard\n"] ++ 
+                          let ln0 = (if nonneg then "" else ("neg(" ++ show(factid) ++ ").\n")) in 
+                          let ln1 = ln0 ++ myrel ++ "(" ++ show(parentid) ++ "," ++ show(factid) ++ ").\n" in 
+                          let ln2 = ln1 ++ "card(" ++ show(factid) ++ ").\n" in 
+                          let crd = (List.foldr (++) "" 
+                                    (let (content,localid) = (List.foldr (factcard' "body" ruleid factid ctr (bidx',False)) ([],0) b) in content)) in 
+                          let ln3 = ln2 ++ crd in 
+                          let minexprid = FactRender.getnext(ctr) in -- let minexprid = (myrand())::Int in 
+                          let mne = if minv == (Sym (Const "any")) then "" 
+                                    else  
+                                    "mincard(" ++ show(factid) ++ "," ++ show(minexprid) ++ ").\n" ++ (unfactmyexpr minv ruleid minexprid ctr) in 
+                          let maxexprid = FactRender.getnext(ctr) in -- let maxexprid = (myrand())::Int in 
+                          let mxe = if maxv == (Sym (Const "any")) then "" 
+                                    else "maxcard(" ++ show(factid) ++ "," ++  show(maxexprid) ++ ").\n" ++ (unfactmyexpr maxv ruleid maxexprid ctr) in 
+                          let ln4 = ln3 ++ crd ++ mne ++ mxe in 
+                          let resaccu = accu' ++ [ln4] in 
+                        (resaccu,idx)
     Count minv maxv b nonneg -> let myrel = (if relstr == "" then "head" else relstr)
                         in 
-                          accu' ++ -- ["YYYCount\n"] ++ 
-                       [(if nonneg then "" else ("neg(" ++ show(factid) ++ ").\n")) ++ 
-                         myrel ++ "(" ++ show(parentid) ++ "," ++ show(factid) ++ ").\n" ++
-                         "weigh(" ++ show(factid) ++ ").\n" ++ 
-                        (List.foldr (++) "" 
-                         (let (content,localid) = (List.foldr (factcard' "body" ruleid factid ctr (bidx',False)) ([],0) b) in content)) 
-                        ++ 
-                        (
-                         let minexprid = FactRender.getnext(ctr) in  
-                         if minv == (Sym (Const "any")) then "" else 
-                             "mincount(" ++ show(factid) ++ "," ++ show(minexprid) ++ ").\n" ++ 
-                                       (unfactmyexpr minv ruleid minexprid ctr)) ++
-                        (
+                          -- let resaccu = accu' ++ -- ["YYYCount\n"] ++ 
+                          let ln0 = (if nonneg then "" else ("neg(" ++ show(factid) ++ ").\n")) in 
+                          let ln1 = ln0 ++ myrel ++ "(" ++ show(parentid) ++ "," ++ show(factid) ++ ").\n" in 
+                          let ln2 = ln1 ++ "weigh(" ++ show(factid) ++ ").\n" in 
+                          let crd = (List.foldr (++) "" 
+                                    (let (content,localid) = (List.foldr (factcard' "body" ruleid factid ctr (bidx',False)) ([],0) b) in content)) in 
+                          let minexprid = FactRender.getnext(ctr) in  
+                          let mce = if minv == (Sym (Const "any")) then "" 
+                                    else "mincount(" ++ show(factid) ++ "," ++ show(minexprid) ++ ").\n" ++ (unfactmyexpr minv ruleid minexprid ctr) in 
                           let maxexprid = FactRender.getnext(ctr) in  
-                         if maxv == (Sym (Const "any")) then "" else 
-                             "maxcount(" ++ show(factid) ++ "," ++  show(maxexprid) ++ ").\n" ++ 
-                                       (unfactmyexpr maxv ruleid maxexprid ctr))
-                       ]
+                          let mxe = if maxv == (Sym (Const "any")) then "" 
+                                    else "maxcount(" ++ show(factid) ++ "," ++  show(maxexprid) ++ ").\n" ++ (unfactmyexpr maxv ruleid maxexprid ctr) in 
+                          let ln3 = ln2 ++ crd ++ mce ++ mxe in 
+                          let resaccu = accu' ++ [ln3] in 
+                          (resaccu,idx)
     Optimize minmax b nonneg -> let myrel = (if relstr == "" then "head" else relstr)
                         in 
-                          accu' ++ 
-                       [(if nonneg then "" else ("neg(" ++ show(factid) ++ ").\n")) ++ 
-                         myrel ++ "(" ++ show(parentid) ++ "," ++ show(factid) ++ ").\n" ++
-                         (if minmax == True then "optimize(" ++ show(factid) ++ ", max).\n" 
-                                            else "optimize(" ++ show(factid) ++ ", min).\n") ++ 
-                        (List.foldr (++) "" 
-                         (let (content,localid) = (List.foldr (factcard' "body" ruleid factid ctr (bidx',False)) ([],0) b) in content)) 
-                       ]
+                           -- let resaccu = accu' ++ 
+                           let ln0 = (if nonneg then "" else ("neg(" ++ show(factid) ++ ").\n")) in 
+                           let ln1 = ln0 ++ myrel ++ "(" ++ show(parentid) ++ "," ++ show(factid) ++ ").\n" in 
+                           let mm = if minmax == True then "optimize(" ++ show(factid) ++ ", max).\n" 
+                                    else "optimize(" ++ show(factid) ++ ", min).\n" in 
+                           let crd = (List.foldr (++) "" 
+                                     (let (content,localid) = (List.foldr (factcard' "body" ruleid factid ctr (bidx',False)) ([],0) b) in content)) in 
+                           let ln2 = ln1 ++ mm ++ crd in 
+                           let resaccu = accu' ++ [ln2] in 
+                               (resaccu, idx)
     Typed b -> let myrel = (if relstr == "" then "head" else relstr)
                         in 
-                   accu' ++ -- ["YYYTyped\n"] ++ 
-                   [myrel ++ "(" ++ show(parentid) ++ "," ++ show(factid) ++ ").\n" ++
-                     "composite(" ++ show(factid) ++ ").\n", -- Z1
-                     -- show(factid) ++ ",rdf:type,http://m3.org/rls#qual\n" ++
-                     (List.foldr (++) ""
-                      (typeargs ruleid factid ctr (bidx',False) b))
-                      {--
-                      (foldr
-                       -- (factbody "type" factid ctr) [] b -- Z2
-                       (factbody "qual" factid ctr) [] b 
-                      ))
-                      --}
-                   ] 
+                   let resaccu = accu' ++ -- ["YYYTyped\n"] ++ 
+                                 [myrel ++ "(" ++ show(parentid) ++ "," ++ show(factid) ++ ").\n" ++
+                                 "composite(" ++ show(factid) ++ ").\n", -- Z1
+                                 -- show(factid) ++ ",rdf:type,http://m3.org/rls#qual\n" ++
+                                 (List.foldr (++) ""
+                                 (typeargs ruleid factid ctr (bidx',False) b))
+                                                       {--
+                                                       (foldr
+                                                         -- (factbody "type" factid ctr) [] b -- Z2
+                                                         (factbody "qual" factid ctr) [] b 
+                                                         ))
+                                                         --}
+                                  ] in (resaccu,idx)
     Weighed e1 b1 nonneg -> -- let wid = (myrand())::Int in
                      -- let eid = (myrand())::Int in
                      -- let wid = FactRender.getnext(ctr) in
                      let eid = FactRender.getnext(ctr) in
                      let myrel = (if relstr == "" then "head" else relstr)
                      in 
-                     accu' ++ -- ["YYYWeighed\n"] ++ 
-                     [ (if nonneg then ("pos(" ++ show(parentid) ++ ").\n")
-                        else ("neg(" ++ show(parentid) ++ ").\n")) ++
-                        myrel ++ "(" ++ show(parentid) ++ "," ++ show(factid) ++ ").\n" ++
-                        (List.foldr (++) "" 
-                         -- (let (content,localid) = (List.foldr (factcount "body" factid ctr) ([],0) b1) in content)) 
-                         (let (content,localid) = (List.foldr (factcount "body" ruleid factid ctr (bidx',False)) ([],0) [b1]) in content)) 
-                        ++ 
-                        (if e1 == (Sym (Const "any")) then "" else 
-                             "weight(" ++ show(factid) ++ "," ++ show(eid) ++ ").\n" ++ 
+                     let resaccu = accu' ++ -- ["YYYWeighed\n"] ++ 
+                                   [ (if nonneg then ("pos(" ++ show(parentid) ++ ").\n")
+                                     else ("neg(" ++ show(parentid) ++ ").\n")) ++
+                                     myrel ++ "(" ++ show(parentid) ++ "," ++ show(factid) ++ ").\n" ++
+                                     (List.foldr (++) "" 
+                                     -- (let (content,localid) = (List.foldr (factcount "body" factid ctr) ([],0) b1) in content)) 
+                                     (let (content,localid) = (List.foldr (factcount "body" ruleid factid ctr (bidx',False)) ([],0) [b1]) in content)) 
+                                     ++ 
+                                     (if e1 == (Sym (Const "any")) then "" else 
+                                     "weight(" ++ show(factid) ++ "," ++ show(eid) ++ ").\n" ++ 
                                        (unfactmyexpr e1 ruleid eid ctr))
-                     ]
+                                     ] in (resaccu, idx)
     BExpr op b1 b2 -> -- let lid = (myrand())::Int in
                       -- let rid = (myrand())::Int in
                       let lid = FactRender.getnext(ctr) in
                       let rid = FactRender.getnext(ctr) in
-              accu' ++ 
-              [-- show (factid) ++ "). %X5\n" ++ 
-              "bexpr(" ++ show(parentid) ++ "," ++ show (factid) ++ ").\n" ++ 
-              "bop(" ++ show (factid) ++ "," ++ "\"" ++ (unbop op) ++ "\"" ++ ").\n" ++ 
-              "larg(" ++ show(factid) ++ "," ++ show(lid) ++ ").\n" ++ (unfactmyexpr b1 ruleid lid ctr) ++ 
-              "rarg(" ++ show(factid) ++ "," ++ show(rid) ++ ").\n" ++ (unfactmyexpr b2 ruleid rid ctr)  ]
-              
+              let resaccu = accu' ++ 
+                          [-- show (factid) ++ "). %X5\n" ++ 
+                          "bexpr(" ++ show(parentid) ++ "," ++ show (factid) ++ ").\n" ++ 
+                          "bop(" ++ show (factid) ++ "," ++ "\"" ++ (unbop op) ++ "\"" ++ ").\n" ++ 
+                          "larg(" ++ show(factid) ++ "," ++ show(lid) ++ ").\n" ++ (unfactmyexpr b1 ruleid lid ctr) ++ 
+                          "rarg(" ++ show(factid) ++ "," ++ show(rid) ++ ").\n" ++ (unfactmyexpr b2 ruleid rid ctr)  ]
+                          in (resaccu, idx)              
               --- show (factid) ++ ",http://m3.org/rls#bop,\"" ++ (unbop op) ++ "\"\n" ++ 
               --- show (factid) ++ ",http://m3.org/rls#left," ++ (unrdfmyexpr b1 lid ) ++ 
               --- show (factid) ++ ",http://m3.org/rls#right," ++ (unrdfmyexpr b2 rid )]
     Assign nm e -> 
            let nid = FactRender.getnext(ctr) in
            let eid = FactRender.getnext(ctr) in
-           accu' ++ 
-           [
-           -- "constdef(" ++ show(factid) ++ ").\n" ++ 
-           "constn(" ++ show(parentid) ++ "," ++ show(nid) ++ ").\n" ++ 
-           "constval(" ++ show(parentid) ++ "," ++ show(eid) ++ ").\n" ++ 
-           (unfactcatom nm nid ruleid) ++ 
-           (unfactmyexpr e ruleid eid ctr)
-           ]
+           let resaccu = accu' ++ 
+                         [
+                         -- "constdef(" ++ show(factid) ++ ").\n" ++ 
+                         "constn(" ++ show(parentid) ++ "," ++ show(nid) ++ ").\n" ++ 
+                         "constval(" ++ show(parentid) ++ "," ++ show(eid) ++ ").\n" ++ 
+                         (unfactcatom nm nid ruleid) ++ 
+                         (unfactmyexpr e ruleid eid ctr)
+                         ] in (resaccu,idx)
     -- Empty -> accu ++ [" NONE "]
     Assignment nm e nonneg -> 
            let nid = FactRender.getnext(ctr) in
            let eid = FactRender.getnext(ctr) in
-           accu' ++ 
-           [
-           (if nonneg then ("pos(" ++ show(parentid) ++ ").\n")
+           let resaccu = accu' ++ 
+                         [
+                         (if nonneg then ("pos(" ++ show(parentid) ++ ").\n")
                            else ("neg(" ++ show(parentid) ++ ").\n")) ++
-           "lefthand(" ++ show(parentid) ++ "," ++ show(nid) ++ ").\n" ++ 
-           "value(" ++ show(parentid) ++ "," ++ show(eid) ++ ").\n" ++ 
-           (unfactcatom nm nid ruleid) ++ 
-           (let (content,localid) = (List.foldr (factcard' "body" ruleid eid ctr (bidx', False)) ([],0) [e]) in List.head (content))
-           -- (factbody "body" eid ctr)
-           -- (unfactmyexpr e eid ctr)
-           ]
-    Empty -> accu 
-    Comment s -> accu ++ ["% " ++ s]
-    Arity a n -> accu
+                           "lefthand(" ++ show(parentid) ++ "," ++ show(nid) ++ ").\n" ++ 
+                           "value(" ++ show(parentid) ++ "," ++ show(eid) ++ ").\n" ++ 
+                           (unfactcatom nm nid ruleid) ++ 
+                           (let (content,localid) = (List.foldr (factcard' "body" ruleid eid ctr (bidx', False)) ([],0) [e]) in List.head (content))
+                           -- (factbody "body" eid ctr)
+                           -- (unfactmyexpr e eid ctr)
+                           ] in (resaccu,idx)
+    Empty -> (accu, idx)
+    Comment s -> ((accu ++ ["% " ++ s]), idx)
+    Arity a n -> (accu,idx)
 
 -- The types stop compiling 
 -- factargs :: (Show a, Num a) => a -> Integer -> [MyExpr] -> IO Integer -> [Char]
@@ -383,7 +511,8 @@ typeargs ruleid parentid ctr (idx,useidx) a =
           -- let exprid = (myrand())::Int in 
           let argid = FactRender.getnext(ctr) in 
           -- let exprid = FactRender.getnext(ctr) in 
-          let new_ac = accu ++ ["tlist(" ++ show(parentid) ++ "," ++ (show (previd+1)) ++ "," ++ show(argid) ++ ").\n"] ++ (factbody "qual" ruleid argid ctr (idx,useidx) i []) 
+          let (fbd,_) = (factbody "qual" ruleid argid ctr (idx,useidx) (i,0) ([],0)) in 
+          let new_ac = accu ++ ["tlist(" ++ show(parentid) ++ "," ++ (show (previd+1)) ++ "," ++ show(argid) ++ ").\n"] ++ fbd 
               in
                 (new_ac,(previd + 1))
 
