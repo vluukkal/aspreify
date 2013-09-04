@@ -106,6 +106,13 @@ bodyvarpos(Rid,Vn,Bidx,Idx) :-
   alist(Predid,Idx,Vid), 
   var(Vid,Vn). 
 
+bodyvarpospre(Rid,Vn,Predid,Idx) :- 
+  rule(Rid), 
+  bodylist(Rid,Bidx,Predid),
+  pred(Predid,Pn), 
+  alist(Predid,Idx,Vid), 
+  var(Vid,Vn). 
+
 one(1). 
 
 % This produces the same value for nxtctr many times over. 
@@ -136,6 +143,7 @@ onerulemap(Rid,Bidx,Predid,Jid,One) :-
   one(One),
   rule(Rid), 
   bodylist(Rid,Bidx,Predid),
+  pred(Predid,Pn),
   assert(Aid), 
   head(Aid,Jid),
   % freectr(Ctr), 
@@ -245,7 +253,89 @@ potential(Rid,Lid) :-
   bodycount(Rid,N), 
   litem(Lid,Rid,Mapid,Nxt,N). 
 
+% Try construct list using function symbols
 
+% The first item is the first mapping 
+%zlist(1,c(1,Predid,Jid,n)) :- 
+%  % onerulemap(Rid,Bidx,Predid,Jid,One). 
+%  onerulemap(Rid,1,Predid,Jid,One). 
+
+% Lets create an entry for the max bodylist 
+zlist(Rid,1,c(1,Predid,Jid,nil)) :-
+  onerulemap(Rid,1,Predid,Jid,One). 
+
+% Recursively grow the list 
+zlist(Rid, N+1, c(N+1,Predid,Jid,c(N, Predidold,Jidold,X)) ) :- 
+  zlist(Rid, N,c(N,Predidold,Jidold,X)),
+  onerulemap(Rid,N+1,Predid,Jid,One),
+  bodycount(Rid,Bc), 
+  consistentassignments(Rid,N+1,Jid,N,Jidold), 
+  % Consistency should check that the predicate names match 
+  N < Bc. 
+
+% We keep the whole list in the last argument 
+nthinzlist(Rid, c(N, Predid,Jid,X), c(N, Predid,Jid,X) ) :- 
+  zlist(Rid, N ,c(N, Predid,Jid,X)),
+  bodycount(Rid,N). 
+
+nthinzlist(Rid, c(N-1, Predid,Jid,X), c(Nconst, Predidconst,Jidconst,Xconst) ) :- 
+  nthinzlist(Rid, c(N, Predidprev,Jidprev,c(N-1,Predid,Jid,X)), c(Nconst, Predidconst,Jidconst,Xconst) ), 
+  N > 0. 
+
+nthinzlist(Rid, N-1, Predid, Jid, c(N, Predidorig, Jidorig, X) ) :- 
+  nthinzlist(Rid, N, Predid, Jid, c(N, Predidorig,Jidorig,X) ), 
+  zlist(Rid, N, c(N,Predidold,Jidold, c(N-1,Predid,Jid,X) )). 
+
+% For each bodyvarpos, produce a variable assignment.
+% In case of conflicting assignments, we get two values for same
+% variable, otherwise they are folded to one. 
+% zassign(Rid,Vn,Val,c(M,Predidorig,Jidorig,X)) :- 
+%zassign(Rid,Vn,Val,c(N,Predid,Jid,X)) :- 
+foo :- 
+  % bodycount(Rid,Bc), 
+  % bodylist(Rid,N,Predid), 
+  % zlist(Rid,Bc,c(N,Predid,Jid,X)),
+  nthinzlist(Rid, c(N, Predid, Jid, Y), c(M, Predidorig, Jidorig, X) ), 
+  % bodyvarpos(Rid,Vn,N,Varpos),
+  bodyvarpospre(Rid,Vn,Predid,Varpos),
+  alist(Jid,Varpos,Cid),
+  cnst(Cid,Val).
+
+zassign(Rid,Predid,Vn,Val, X) :- 
+  % Here's the Jid associated with a Predidid,
+  nthinzlist(Rid, c(N, Predid, Jid, Y), X ),
+  % We need the variables bound by Predid. 
+  bodyvarpospre(Rid,Vn,Predid,Pos),
+  % We need to get the value from Jid
+  alist(Jid,Pos,Cid),
+  cnst(Cid,Val).
+
+visiblezassign(Rid,Vn,Val,X) :- 
+  zassign(Rid,Predid,Vn,Val, X), 
+  headvarval(Rid,Pn,Bidx,Vn,A,B). 
+
+diffzassign(X1,X2) :- 
+  visiblezassign(Rid,Vn,Val1,X1),
+  visiblezassign(Rid,Vn,Val2,X2),
+  Val1 != Val2. 
+
+samezassign(X1,X2) :- 
+  visiblezassign(Rid,Vn1,Val1,X1), 
+  visiblezassign(Rid,Vn2,Val2,X2), 
+  % X1 != X2, 
+  not diffzassign(X1,X2). 
+
+inconsistentzlist(Rid,X) :- 
+  zassign(Rid,Predid1,Vn,Val1,X), 
+  zassign(Rid,Predid2,Vn,Val2,X),
+  Val1 != Val2. 
+
+consistentzlist(Rid,X) :- 
+  not inconsistentzlist(Rid, X), 
+  bodycount(Rid,Len), 
+  zlist(Rid,Len,X).
+
+% Next check whether the two lists have the same external values 
 
 % Now we assign the N'th bodypredicate of Rid according to Lid
 % This is just renaming the information in the list for now. 
@@ -622,42 +712,46 @@ goodassign(Lid,Rid) :-
   not badassign(Lid,Rid). 
 
 
-% newpotfact2(@nxtctr(N+2), Rid) :- 
 % newpotfact(@nxtctr(N+2), Rid, Lid, Pn) :- 
-newpotfact(@nxtctr(N+3), Rid, Lid, Pn) :- 
-% oink :- % XXX 
-  % goodassign(Lid,Rid), % XXX 28. maybe this is not needed 
-  %nxt(X),
-  %X < 2048, 
-  pickinternal(Lid,Rid), 
-  pickexternal(Lid,Rid), 
-  % not projectreallysame(Lid,Rid), % will generate a large amount of answer sets, but cuts also away some valid solutions
-  % not banishalid(Lid,Rid), % will stop everything ...
-  % not prassigned(Lid), % will stop everything 
+% 2 {newpotfact(@nxtctr(N+3), Rid, Pn, c(Idx,Predid,Jid,X)), assigned(c(Idx,Predid,Jid,X)) } 2 :- 
+2 {newpotfact(@nxtctr(N+3), Rid, Pn, c(Idx,Predid,Jid,X)), assigned(c(Idx,Predid,Jid,X)) } 2 :- 
+  consistentzlist(Rid, c(Idx,Predid,Jid,X)), 
+  % Now pick a representative among the zlists which are the same
+  pickzassign(c(Idx,Predid,Jid,X)), 
+  evaluable(Rid), 
   head(Rid,Hid), 
   arity(Hid,N), 
   pred(Hid,Pn). 
 
+assigned(X) :- 
+  assigned(Y), 
+  samezassign(Y,X).
+
+pickzassign(c(Idx,Predid1,Jid1,X1)) :- 
+  samezassign(c(Idx,Predid1,Jid1,X1),c(Idx,Predid2,Jid2,X2)),
+  Jid1 < Jid2. 
+
+
 hasrule(1,NF) :- 
-  newpotfact(NF, Rid, Lid, Pn). 
+  newpotfact(NF, Rid, Pn, X). 
 
 pos(NF+1) :- 
-  newpotfact(NF, Rid, Lid, Pn). 
+  newpotfact(NF, Rid, Pn, X). 
 
-newname(NF,Lid,"JOPI") :- 
-  newpotfact(NF, Rid, Lid, Pn). 
+newname(NF,"JOPI") :- 
+  newpotfact(NF, Rid, Pn, X). 
 
 head(NF,NF+1) :- 
-  newpotfact(NF, Rid, Lid, Pn). 
+  newpotfact(NF, Rid, Pn, X). 
 
 pred(NF + 1, Pn ) :- 
-  newpotfact(NF, Rid, Lid, Pn). 
+  newpotfact(NF, Rid, Pn, X). 
 
-assigned(Lid,NF) :- 
-  newpotfact(NF, Rid, Lid, Pn). 
+%assigned(NF) :- 
+%  newpotfact(NF, Rid, Pn, X). 
 
-assert(NF) :- 
-  newpotfact(NF, Rid, Lid, Pn). 
+%assert(NF) :- 
+%  newpotfact(NF, Rid, Pn, X). 
 
 pickedandgood(Lid,Rid) :- 
   goodassign(Lid,Rid),
@@ -680,28 +774,25 @@ assigned(Lid2,New) :-
   fullsameext(Lid1,Rid,New), 
   fullsameext(Lid2,Rid,New).
 
-
-
-lsttmp(NF,N,Val,A, Lid, Rid) :- 
-  newpotfact(NF, Rid, Lid, Pn),
-  pickinternal(Lid,Rid), 
+lsttmp(NF,N,Val,A, Rid) :- 
+  newpotfact(NF, Rid, Pn, X),
   head(Rid,Hid), 
   arity(Hid,A), 
-  visibleassign(Lid,Rid,Vn,Val), 
+  visiblezassign(Rid,Vn,Val,X), 
   alist(Hid,N,Vid), 
   var(Vid,Vn). 
 
 alist(NF+1,N,NF+1+N) :- 
-  lsttmp(NF,N,Val,A,Lid, Rid).
+  lsttmp(NF,N,Val,A,Rid).
 
 cnst(NF+1+N,Val) :- 
-  lsttmp(NF,N,Val,A, Lid, Rid).
+  lsttmp(NF,N,Val,A, Rid).
 
 arity(NF+1,A) :- 
-  lsttmp(NF,N,Val,A, Lid, Rid).
+  lsttmp(NF,N,Val,A, Rid).
 
 assert(NF) :- 
-  lsttmp(NF,N,Val,A,Lid, Rid).
+  lsttmp(NF,N,Val,A, Rid).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 % Trial here generated rule-specific rules which 
@@ -785,6 +876,7 @@ consistentassignments(Rid,Bidx1,Jid1,Bidx2,Jid2) :-
 
 % Agree on variables in the head
 % Target: chunga(Rid,Vn,Val1,Predid1,Jid1,Val2,Predid2,Jid2) :- 
+% XXX not used yet 
 headconsistentvariable(Rid,Vn,Val1,Jid1,Predid1,Val2,Predid2,Jid2) :- 
   onerulemap(Rid, Bidx1, Predid1, Jid1, One1),
   onerulemap(Rid, Bidx2, Predid2, Jid2, One2),
@@ -798,215 +890,25 @@ headconsistentvariable(Rid,Vn,Val1,Jid1,Predid1,Val2,Predid2,Jid2) :-
   cnst(Vid2,Val2),
   Val1 == Val2.
 
+% A rule has a body which is negated
+nonevaluable(Rid,Bid) :- 
+  body(Rid,Bid), 
+  neg(Bid). 
 
-skeleton8(Rid, Jid1, Jid2) :- 
-  % A generic portion derived from the structure
-  rule(Rid), 
-  Rid == 8,
-  onerulemap(Rid,Bidx1,Predid1,Jid1,One1),    % One is no needed at all 
-  Bidx1 == 1, 
-  onerulemap(Rid,Bidx2,Predid2,Jid2,One2),    % One is no needed at all 
-  Bidx2 == 2,
-  % Here we compare the internal consistency of the 
-  % Justifications, and it'd have to be here as elsewhere 
-  % we would need to know the number of the arguments to do 
-  % the comparison effeftively. 
-  % We get all of the variables and make them agree 
-  % This is basically mapsagreeonvars
-  % But this is only in the head for now, the internals could be broken 
-  consistentassignments(Rid,Bidx1,Jid1,Bidx2,Jid2). 
-  % headconsistentvariableinhead(Rid,Vn,Val1,Jid1,Predid1,Val2,Predid2,Jid2). 
+% A rule refers to a nonevaluable rule 
+nonevaluable(Rid1,Bid1) :- 
+  body(Rid1,Bid1), 
+  pred(Bid1,Pn), 
+  rule(Rid2), 
+  head(Rid2,Hid2),
+  pred(Hid2,Pn), 
+  nonevaluable(Rid2,Bid2).
 
-skeletonfinal8(Rid,Val1,Val2)   :- 
-  skeleton8(Rid, Jid1, Jid2),
-  headvarval(Rid,Pn,Idx1,Vn1,Bidx1,Pos1),
-  Idx1 == 1,
-  alist(Jid1,Pos1,Vid1),
-  cnst(Vid1,Val1), 
-  headvarval(Rid,Pn,Idx2,Vn2,Bidx2,Pos2),
-  Idx2 == 2,
-  alist(Jid2,Pos2,Vid2),
-  cnst(Vid2,Val2).
+prnonevaluable(Rid) :- nonevaluable(Rid,Bid). 
 
-skeleton2(Rid, Jid1) :- 
-  rule(Rid), 
-  Rid == 2,
-  % No need to check for consistency, any map is OK
-  onerulemap(Rid,Bidx1,Predid1,Jid1,One1).    % One is no needed at all 
-
-skeletonfinal2(Rid,Val1)   :- 
-  skeleton2(Rid, Jid1),
-  headvarval(Rid,Pn,Idx1,Vn1,Bidx1,Pos1),
-  Idx1 == 1,
-  alist(Jid1,Pos1,Vid1),
-  cnst(Vid1,Val1). 
-
-% Create the actual fact 
-skeletonassert2(@nxtctr(N+3), Rid, V1) :- 
-  skeletonfinal2(Rid,V1),
-  Rid == 2,
-  head(Rid,Hid),
-  arity(Hid,N). 
-
-hasrule(1,NF) :- 
-  skeletonassert2(NF, Rid, V1). 
-
-pos(NF+1) :- 
-  skeletonassert2(NF, Rid, V1). 
-
-newname(NF,"JOPI") :- 
-  skeletonassert2(NF, Rid, V1). 
-
-head(NF,NF+1) :- 
-  skeletonassert2(NF, Rid, V1). 
-
-pred(NF + 1, Pn ) :- 
-  skeletonassert2(NF, Rid, V1),
-  head(Rid,Hid), 
-  pred(Hid,Pn).
-
-% We couuld count down from arity though 
-% alist(NF+1,N,NF+N+1) :- 
-alist(NF+1,1,NF+1+1) :- 
-  skeletonassert2(NF, Rid, V1). 
-
-% cnst(NF+1+N,V1) :- 
-cnst(NF+1+1,V1) :- 
-  skeletonassert2(NF, Rid, V1). 
-
-arity(NF+1,A) :- 
-  skeletonassert2(NF, Rid, V1),
-  head(Rid,Hid), 
-  arity(Hid,A).
-
-assert(NF) :- 
-  skeletonassert2(NF, Rid, V1). 
-
-% Create the actual fact 
-skeletonassert8(@nxtctr(N+3), Rid, V1, V2) :- 
-  skeletonfinal8(Rid,V1,V2),
-  Rid == 8,
-  head(Rid,Hid),
-  arity(Hid,N). 
-
-hasrule(1,NF) :- 
-  skeletonassert8(NF, Rid, V1,V2). 
-
-pos(NF+1) :- 
-  skeletonassert8(NF, Rid, V1,V2). 
-
-newname(NF,"JOPI") :- 
-  skeletonassert8(NF, Rid, V1,V2). 
-
-head(NF,NF+1) :- 
-  skeletonassert8(NF, Rid, V1,V2). 
-
-pred(NF + 1, Pn ) :- 
-  skeletonassert8(NF, Rid, V1,V2),
-  head(Rid,Hid), 
-  pred(Hid,Pn).
-
-% We couuld count down from arity though 
-% alist(NF+1,N,NF+N+1) :- 
-alist(NF+1,1,NF+1+1) :- 
-  skeletonassert8(NF, Rid, V1, V2). 
-alist(NF+1,2,NF+2+1) :- 
-  skeletonassert8(NF, Rid, V1, V2). 
-
-
-% cnst(NF+1+N,V1) :- 
-cnst(NF+1+1,V1) :- 
-  skeletonassert8(NF, Rid, V1, V2). 
-cnst(NF+2+1,V2) :- 
-  skeletonassert8(NF, Rid, V1, V2). 
-
-arity(NF+1,A) :- 
-  skeletonassert8(NF, Rid, V1, V2),
-  head(Rid,Hid), 
-  arity(Hid,A).
-
-assert(NF) :- 
-  skeletonassert8(NF, Rid, V1, V2). 
-
-
-
-  
-skeleton18(Rid, Jid1, Jid2) :- 
-  % A generic portion derived from the structure
-  rule(Rid), 
-  Rid == 18,
-  onerulemap(Rid,Bidx1,Predid1,Jid1,One1),    % One is no needed at all 
-  Bidx1 == 1, 
-  onerulemap(Rid,Bidx2,Predid2,Jid2,One2),    % One is no needed at all 
-  Bidx2 == 2,
-  % Here we compare the internal consistency of the 
-  % Justifications, and it'd have to be here as elsewhere 
-  % we would need to know the number of the arguments to do 
-  % the comparison effeftively. 
-  % We get all of the variables and make them agree 
-  % This is basically mapsagreeonvars
-  % But this is only in the head for now, the internals could be broken 
-  consistentassignments(Rid,Bidx1,Jid1,Bidx2,Jid2). 
-  % headconsistentvariableinhead(Rid,Vn,Val1,Jid1,Predid1,Val2,Predid2,Jid2). 
-
-skeletonfinal18(Rid,Val1,Val2)   :- 
-  skeleton18(Rid, Jid1, Jid2),
-  headvarval(Rid,Pn,Idx1,Vn1,Bidx1,Pos1),
-  Idx1 == 1,
-  alist(Jid1,Pos1,Vid1),
-  cnst(Vid1,Val1), 
-  headvarval(Rid,Pn,Idx2,Vn2,Bidx2,Pos2),
-  Idx2 == 2,
-  alist(Jid2,Pos2,Vid2),
-  cnst(Vid2,Val2).
-
-% Create the actual fact 
-skeletonassert18(@nxtctr(N+3), Rid, V1, V2) :- 
-  skeletonfinal18(Rid,V1,V2),
-  Rid == 18,
-  head(Rid,Hid),
-  arity(Hid,N). 
-
-hasrule(1,NF) :- 
-  skeletonassert18(NF, Rid, V1,V2). 
-
-pos(NF+1) :- 
-  skeletonassert18(NF, Rid, V1,V2). 
-
-newname(NF,"JOPI") :- 
-  skeletonassert18(NF, Rid, V1,V2). 
-
-head(NF,NF+1) :- 
-  skeletonassert18(NF, Rid, V1,V2). 
-
-pred(NF + 1, Pn ) :- 
-  skeletonassert18(NF, Rid, V1,V2),
-  head(Rid,Hid), 
-  pred(Hid,Pn).
-
-% We couuld count down from arity though 
-% alist(NF+1,N,NF+N+1) :- 
-alist(NF+1,1,NF+1+1) :- 
-  skeletonassert18(NF, Rid, V1, V2). 
-alist(NF+1,2,NF+2+1) :- 
-  skeletonassert18(NF, Rid, V1, V2). 
-
-
-% cnst(NF+1+N,V1) :- 
-cnst(NF+1+1,V1) :- 
-  skeletonassert18(NF, Rid, V1, V2). 
-cnst(NF+2+1,V2) :- 
-  skeletonassert18(NF, Rid, V1, V2). 
-
-arity(NF+1,A) :- 
-  skeletonassert18(NF, Rid, V1, V2),
-  head(Rid,Hid), 
-  arity(Hid,A).
-
-assert(NF) :- 
-  skeletonassert18(NF, Rid, V1, V2). 
-
-
+evaluable(Rid) :- 
+  body(Rid,Bid), 
+  not prnonevaluable(Rid). 
 
 % #hide. 
 
