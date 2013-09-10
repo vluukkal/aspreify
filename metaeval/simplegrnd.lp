@@ -314,6 +314,166 @@ visiblezassign(Rid,Vn,Val,X) :-
   zassign(Rid,Predid,Vn,Val, X), 
   headvarval(Rid,Pn,Bidx,Vn,A,B). 
 
+zpredlst(Rid, X, Pn, v(1,Val,nil) ) :- 
+  visiblezassign(Rid,Vn,Val,X),
+  bodyvarpospre(Rid,Vn,Predid,1),
+  head(Rid,Hid),
+  pred(Hid,Pn). 
+  % pred(Predid,Pn).
+
+%
+% zpredlst(8,c(2,12,27,c(1,15,31,nil)),"edge",v(2,"1",v(1,"1",nil))).
+%              ^                                ^
+% If these two are equal to bodycount(Rid,N) then this is valid
+%
+zpredlst(Rid, Z, Pn, v(N+1,Val,v(N,Valold,X)) ) :- 
+  zpredlst(Rid, Z, Pn, v(N,Valold,X) ), 
+  visiblezassign(Rid,Vn,Val,Z),
+  bodyvarpospre(Rid,Vn,Predid,N+1), 
+  % pred(Predid,Pn).
+  head(Rid,Hid),
+  pred(Hid,Pn). 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+apredlst(Aid,Pn,v(1,Val,nil)) :- 
+  assert(Aid), 
+  head(Aid,Hid), 
+  pred(Hid,Pn), 
+  alist(Hid,1,Cid),
+  cnst(Cid,Val). 
+
+apredlst(Aid,Pn,v(N+1,Val,v(N,Valold,X))) :- 
+  apredlst(Aid,Pn,v(N,Valold,X)), 
+  assert(Aid), 
+  head(Aid,Hid), 
+  pred(Hid,Pn), 
+  alist(Hid,N+1,Cid),
+  cnst(Cid,Val). 
+
+% Base case, the highest number  
+nthinapredlst(Aid, Pn, N, v(N,Val,X) , v(N,Val,X) ) :- 
+  apredlst(Aid,Pn,v(N,Val,X)), 
+  head(Aid,Hid),
+  arity(Hid,N).
+
+nthinapredlst(Aid, Pn, N-1, v(N-1,Val2,Y), v(M,Valold,X) ) :- 
+  nthinapredlst(Aid, Pn, N, v(N,Val1,v(N-1,Val2,Y)), v(M,Valold,X) ), 
+  N - 1 > 0. 
+
+lmap(Rid,Predid,v(N,Val1,X)) :- 
+  apredlst(Aid,Pn,v(N,Val1,X)), 
+  bodylist(Rid,I,Predid),
+  pred(Predid,Pn),
+  arity(Predid,N).
+
+
+xassign(Rid,Predid,Vn,Val, v(N,Val1,Rest)) :- 
+  % The assignment list from a ground predicate 
+  lmap(Rid,Predid,v(N,Val1,Rest)), 
+  % We need the variables bound by Predid. 
+  bodyvarpospre(Rid,Vn,Predid,Pos),
+  % We need to get the value at position Pos and it is 
+  % coming from some ground fact Aid
+  nthinapredlst(Aid,Pn,Pos, v(Pos,Val,X), v(N,Val1,Rest)).
+
+
+xconflict(Rid,Vn, Val1, Predid1, Val2, Predid2, X1, X2) :- 
+  xassign(Rid,Predid1,Vn,Val1, X1),
+  xassign(Rid,Predid2,Vn,Val2, X2),
+  Val1 != Val2. 
+
+% Conflicting is always relative
+xconflicting(Rid,X1,X2) :- xconflict(Rid,Vn, Val1, Predid1, Val2, Predid2, X1, X2).
+
+xcompatible(Rid,Vn, Val1, X1, X2) :- 
+  xassign(Rid,Predid1,Vn,Val1, X1),
+  xassign(Rid,Predid2,Vn,Val2, X2),
+  X1 != X2,
+  Val1 == Val2. 
+
+visiblexassign(Rid,Vn,Val,X) :- 
+  xassign(Rid,Predid,Vn,Val, X), 
+  % not xconflicting(Rid,X), 
+  headvarval(Rid,Pn,Bidx,Vn,A,B). 
+
+diffxassign(X1,X2) :- 
+  visiblexassign(Rid,Predid1,Vn,Val1,X1),
+  visiblexassign(Rid,Predid2,Vn,Val2,X2),
+  Val1 != Val2. 
+
+samexassign(X1,X2) :- 
+  visiblexassign(Rid,Predid1,Vn,Val1,X1),
+  visiblexassign(Rid,Predid2,Vn,Val2,X2),
+  % X1 != X2, 
+  not diffzassign(X1,X2). 
+
+inconsistentxlist(Rid,X) :- 
+  xassign(Rid,Predid1,Vn,Val1,X), 
+  xassign(Rid,Predid2,Vn,Val2,X),
+  Val1 != Val2. 
+
+%consistentxlist(Rid,X) :- 
+%  not inconsistentxlist(Rid, X), 
+%  bodycount(Rid,Len), 
+%  zlist(Rid,Len,X).
+
+% Now we need to tag one assigned xassign 
+% as a selection.   
+
+
+% And now form visiblexassign's we collect a new list for the head
+% Later on we can decide whether we call this the apredlist.
+% We start with the first item. 
+% We may have to carry the source list with us and then later 
+% project it away. 
+
+% ylist(Rid,Vn,Pn,Predid,Pos) :- 
+vlist(Rid,Pn,v(1, Val, nil), X ) :- 
+  visiblexassign(Rid,Vn,Val,X),
+  % We need the variables bound by Predid. 
+  bodyvarpospre(Rid,Vn,Predid,Pos), 
+  Pos == 1, 
+  head(Rid,Hid),
+  pred(Hid,Pn).
+
+% Build iteratively 
+vlist(Rid,Pn,v(N+1, Valnew, v(N, Val, Rest) ), X) :- 
+  vlist(Rid,Pn,v(N, Val, Rest), X ), 
+  visiblexassign(Rid,Vn,Valnew,X),
+  bodyvarpospre(Rid,Vn,Predid,N+1), 
+  head(Rid,Hid),
+  pred(Hid,Pn).
+
+% And finally, project to apredlst
+apredlst(Rid,Pn,L) :- 
+  vlist(Rid,Pn, L, Y ). 
+
+% And if the rule is evaluable, we project it to ground rule,
+% we could also mkassign it, perhaps to reuse old code of the dereifier
+% ... but we still continue with the abstract plan so that we dont have 
+% to take into account duplicate removal. 
+groundrule(Pn,v(N,Val,Rest)) :- 
+  apredlst(Rid,Pn,v(N,Val,Rest)),
+  head(Rid,Hid),
+  arity(Hid,N), 
+  evaluable(Rid). 
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+duplicate(Rid,Y) :- 
+  apredlst(Aid,Pn, v(N,Valold,X) ),
+  zpredlst(Rid, Y, Pn, v(N,Valold,X) ),
+  bodycount(Rid,N). 
+
+   
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
 diffzassign(X1,X2) :- 
   visiblezassign(Rid,Vn,Val1,X1),
   visiblezassign(Rid,Vn,Val2,X2),
@@ -714,10 +874,12 @@ goodassign(Lid,Rid) :-
 
 % newpotfact(@nxtctr(N+2), Rid, Lid, Pn) :- 
 % 2 {newpotfact(@nxtctr(N+3), Rid, Pn, c(Idx,Predid,Jid,X)), assigned(c(Idx,Predid,Jid,X)) } 2 :- 
-2 {newpotfact(@nxtctr(N+3), Rid, Pn, c(Idx,Predid,Jid,X)), assigned(c(Idx,Predid,Jid,X)) } 2 :- 
+% 2 {newpotfact(@nxtctr(N+3), Rid, Pn, c(Idx,Predid,Jid,X)), assigned(c(Idx,Predid,Jid,X)) } 2 :- 
+boogol :- 
   consistentzlist(Rid, c(Idx,Predid,Jid,X)), 
   % Now pick a representative among the zlists which are the same
   pickzassign(c(Idx,Predid,Jid,X)), 
+  not duplicate(Rid,X), 
   evaluable(Rid), 
   head(Rid,Hid), 
   arity(Hid,N), 
