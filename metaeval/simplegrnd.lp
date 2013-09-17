@@ -1071,9 +1071,51 @@ pickzassign(c(Idx,Predid1,Jid1,X1)) :-
   samezassign(c(Idx,Predid1,Jid1,X1),c(Idx,Predid2,Jid2,X2)),
   Jid1 < Jid2. 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% The funcsym based solutions
+% are below
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+hasrule(1,id(Id,0)) :- 
+  groundrule(Pn,Id).
+
+pos(id(Id,1)) :- 
+  groundrule(Pn,Id). 
+
+newname(id(Id,0),"JOPI") :- 
+  groundrule(Pn,Id). 
+
+head(id(Id,0),id(Id,1)) :- 
+  groundrule(Pn,Id). 
+
+pred(id(Id,1), Pn ) :- 
+  groundrule(Pn,Id). 
+
+alist(id(Id,1),N,id(Id,1+N)) :- 
+  groundrule(Pn,Id), 
+  nthinapredlst(Rid,Pn,N,Item,Id ). 
+
+cnst(id(Id,1+N),Val) :- 
+  groundrule(Pn,Id), 
+  nthinapredlst(Rid,Pn,N,v(N,Val,Rest),Id ). 
+
+arity(id(Id,1),A) :- 
+  head(Rid,Hd), 
+  arity(Hd,A), 
+  groundrule(Pn,Id), 
+  nthinapredlst(Rid,Pn,N,v(N,Val,Rest),Id ). 
+
+assert(id(Id,0)) :- 
+  groundrule(Pn,Id). 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% The integer based solutions 
+% are below
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 hasrule(1,NF) :- 
   newpotfact(NF, Rid, Pn, X). 
+
 
 pos(NF+1) :- 
   newpotfact(NF, Rid, Pn, X). 
