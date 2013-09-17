@@ -115,6 +115,7 @@ getarg a n =
        case elem of 
            Sym (Const s) -> s
            Number (Const s) -> s
+           Func n a nonneg -> (unmyexpr (Func n a nonneg) )
 
 -- Here we dispatch based on the name of the reified predicate 
 -- The types of the hashes could be changed, but would it just make life
@@ -414,7 +415,7 @@ citem handleall hash key accu =
                           -- Check here if this is newly generated one. 
                           if (M.member key (newfact hash') ) then (cassert hash' key (cmnt:accu)) else accu 
       -- Just "composite" -> cassert hash key accu 
-      Just x -> (Deny [Plain (Const ("Error at citem: unknown item: "++ x )) [] True]):accu 
+      Just x -> (Deny [Plain (Const ("Error at citem: unknown item: "++ x ++ " for key " ++ show(key) )) [] True]):accu 
       Nothing -> -- accu 
               (Deny [Plain (Const ("Error at citem: unknown ID: "++key )) [] True]):accu 
    where 
@@ -746,6 +747,7 @@ cexpr hash key =
    case tp of 
         Just "var" -> cvar hash key
         Just "cnst" -> cconst hash key
+        Just x -> (Sym (Const ("cexpr error unknown prop: " ++ x)))
         Nothing -> (Sym (Const ("cexpr error unknown key: " ++ key)))
 
 
