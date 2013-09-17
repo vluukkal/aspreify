@@ -88,13 +88,23 @@ txtcomment t =
   let newl = List.map (\x -> "% " ++ x ) l in 
   unlines newl
 
--- The arity of the head as a string. 
+-- The arity of the head.
 -- For now it is zero for anything else than plain body. 
 getheadarity :: Body -> Int
 getheadarity b = 
   case b of 
     Plain n a nonneg -> List.length a
     _ -> 0
+
+getheadname :: Body -> String 
+getheadname b = 
+  case b of 
+    Plain n a nonneg -> 
+      case n of 
+        Const s -> s 
+        _ -> "NONAMEVAR"
+    _ -> "NONAME"
+              
 
 -- We create the head of a skeleton based on the arity of the 
 -- reified head. 
@@ -124,10 +134,12 @@ mkconsistentassignments arity =
     bodies
 
 
-justskeleton :: Body -> Integer -> String 
-justskeleton b ruleid = 
+justskeleton :: Body -> Int -> Integer -> String 
+justskeleton b bodycount ruleid = 
   let arity = getheadarity b in 
-  let nm = "skeleton" ++ show(ruleid) in 
+  let pn = getheadname b in 
+  -- let nm = "skeleton" ++ show(ruleid) in 
+  let nm = "skeleton" ++ pn in 
   let hd = mkskeletonhead nm "Jid" arity in 
   let common = mkskeletoncommon ruleid in 
   let rulemaps = mkrulemaps arity in 
@@ -148,64 +160,69 @@ mkheadvarval arity =
   let bodies = concat $ List.intersperse ",\n" bds in 
     bodies
 
-mkskeletonfinal :: Integer -> Int -> String 
-mkskeletonfinal ruleid arity = 
-  let nm = "skeletonfinal" ++ show(ruleid) in 
+mkskeletonfinal :: Integer -> Int -> String -> String 
+mkskeletonfinal ruleid arity rname = 
+  -- let nm = "skeletonfinal" ++ show(ruleid) in 
+  let nm = "skeletonfinal" ++ rname in 
   let hd = mkskeletonhead nm "Val" arity in 
-  let link = mkskeletonhead ("skeleton" ++ show(ruleid)) "Jid" arity in 
+  -- let link = mkskeletonhead ("skeleton" ++ show(ruleid)) "Jid" arity in 
+  let link = mkskeletonhead ("skeleton" ++ rname) "Jid" arity in 
   let final = mkheadvarval arity in 
     hd ++ ":-\n  " ++ link ++ ",\n" ++ final ++ ".\n"
 
-mkskeletonassert :: Integer -> Int -> String -> String 
-mkskeletonassert ruleid arity firstarg = 
-  let nm = ("skeletonassert" ++ show(ruleid)) in 
+mkskeletonassert :: Integer -> Int -> String -> String -> String 
+mkskeletonassert ruleid arity firstarg rname = 
+  -- let nm = ("skeletonassert" ++ show(ruleid)) in 
+  let nm = ("skeletonassert" ++ rname) in 
   let nms = enumFromTo 1 arity in 
   let jids = map (\i -> "V" ++ show(i)) nms in 
   let args = concat $ List.intersperse "," (firstarg:"Rid":jids) in 
     nm ++ "(" ++ args ++ ")"
 
-mkskeletonderivers hd ruleid arity = 
-  let bd = mkskeletonassert ruleid arity "NF" in bd 
+mkskeletonderivers hd ruleid arity rname = 
+  let bd = mkskeletonassert ruleid arity "NF" rname in bd 
 
-mkalistderivers ruleid arity = 
+mkalistderivers ruleid arity rname = 
   let nms = enumFromTo 1 arity in 
-  let ids = map (\i -> "alist(NF+1," ++ show(i) ++ ",NF+" ++ show(i) ++ "+1) :-" ++ (mkskeletonderivers "XXX" ruleid arity) ) nms in 
+  let ids = map (\i -> "alist(NF+1," ++ show(i) ++ ",NF+" ++ show(i) ++ "+1) :-" ++ (mkskeletonderivers "XXX" ruleid arity rname) ) nms in 
   let res = concat $ List.intersperse ".\n" (ids) in 
   res
 
-mkcnstderivers ruleid arity = 
+mkcnstderivers ruleid arity rname = 
   let nms = enumFromTo 1 arity in 
-  let ids = map (\i -> "cnst(NF+" ++ show(i) ++ "+1,V" ++ show(i) ++ ") :-" ++ (mkskeletonderivers "XXX" ruleid arity) ) nms in 
+  let ids = map (\i -> "cnst(NF+" ++ show(i) ++ "+1,V" ++ show(i) ++ ") :-" ++ (mkskeletonderivers "XXX" ruleid arity rname) ) nms in 
   let res = concat $ List.intersperse ".\n" (ids) in 
   res
 
   
 
-mkskeletoncreator :: Integer -> Int -> String 
-mkskeletoncreator ruleid arity = 
+mkskeletoncreator :: Integer -> Int -> String -> String 
+mkskeletoncreator ruleid arity rname = 
   let ctrname = "@nxtctr(N+3)" in 
-  let hd = mkskeletonassert ruleid arity ctrname in 
-  let final = mkskeletonhead ("skeletonfinal" ++ show(ruleid)) "V" arity in 
+  let hd = mkskeletonassert ruleid arity ctrname rname in 
+  -- let final = mkskeletonhead ("skeletonfinal" ++ show(ruleid)) "V" arity in 
+  let final = mkskeletonhead ("skeletonfinal" ++ rname) "V" arity in 
   let one = "  Rid == " ++ show(ruleid) in 
   let two = "  head(Rid,Hid)" in 
   let three = "  arity(Hid,N)" in 
   hd ++ ":-\n  " ++ final ++ ",\n" ++ one ++ ",\n" ++ two ++ ",\n" ++ three ++ ".\n"
 
-mkskeletons :: Body -> Integer -> String 
-mkskeletons b ruleid = 
+mkskeletons :: Body -> Int -> Integer -> String 
+mkskeletons b numbodies ruleid = 
   let arity = (getheadarity b) in 
-  let justified = justskeleton b ruleid in 
-  let final = mkskeletonfinal ruleid arity in 
-  let creator = mkskeletoncreator ruleid arity in 
-  let d1 = "hasrule(1,NF) :- " ++ (mkskeletonderivers "" ruleid arity) in 
-  let d2 = "pos(NF+1) :- " ++ (mkskeletonderivers "" ruleid arity) in 
-  let d3 = "newname(NF,\"JOPI\") :- " ++ (mkskeletonderivers "" ruleid arity) in 
-  let d4 = "head(NF,NF+1) :- " ++ (mkskeletonderivers "" ruleid arity) in 
-  let d5 = ("pred(NF+1,Pn) :- " ++ (mkskeletonderivers "" ruleid arity) ++ ",\n  head(Rid,Hid),\n  pred(Hid,Pn)" ) in 
-  let alistd = mkalistderivers ruleid arity in 
-  let cnstd = mkcnstderivers ruleid arity in 
-  let d6 = ("arity(NF+1,A) :- " ++ (mkskeletonderivers "" ruleid arity) ++ ",\n  head(Rid,Hid),\n  arity(Hid,A)" ) in 
-  let d7 = "assert(NF) :- " ++ (mkskeletonderivers "" ruleid arity) in 
+  let nm = (getheadname b) in 
+  let justified = justskeleton b numbodies ruleid in 
+  let final = mkskeletonfinal ruleid arity nm in 
+  let creator = mkskeletoncreator ruleid arity nm in 
+  let d1 = "hasrule(1,NF) :- " ++ (mkskeletonderivers "" ruleid arity nm) in 
+  let d2 = "pos(NF+1) :- " ++ (mkskeletonderivers "" ruleid arity nm) in 
+  let d3 = "newname(NF,\"JOPI\") :- " ++ (mkskeletonderivers "" ruleid arity nm) in 
+  let d4 = "head(NF,NF+1) :- " ++ (mkskeletonderivers "" ruleid arity nm) in 
+  let d5 = ("pred(NF+1,Pn) :- " ++ (mkskeletonderivers "" ruleid arity nm) ++ ",\n  head(Rid,Hid),\n  pred(Hid,Pn)" ) in 
+  let alistd = mkalistderivers ruleid arity nm in 
+  let cnstd = mkcnstderivers ruleid arity nm in 
+  let d6 = ("arity(NF+1,A) :- " ++ (mkskeletonderivers "" ruleid arity nm) ++ ",\n  head(Rid,Hid),\n  arity(Hid,A)" ) in 
+  let d7 = "assert(NF) :- " ++ (mkskeletonderivers "" ruleid arity nm) in 
   "\n" ++ justified ++ "\n" ++ final ++ "\n" ++ creator ++ (concat $ List.intersperse ".\n" [d1,d2,d3,d4,d5,alistd,cnstd,d6,d7]) ++ ".\n\n"
 
 
@@ -229,7 +246,8 @@ factitem fid ctr i accu =
     let ctext = txtcomment(txtitem i "") in 
     case i of
       Rule b l -> 
-                  let numbodies = show(List.length l) in 
+                  let bn = List.length l in 
+                  let numbodies = show(bn) in 
                   let (tmplst,_) = factbody "" ruleid ruleid ctr (bidx,False) (b,bidx) ([],0) in 
                   let hdlst = head(tmplst) in 
                   -- let (bodylst,ctr) = (List.foldr (++) "" (List.foldr (factbody "body" ruleid ruleid ctr (bidx,True)) ([],0) (l,bidx))) in 
@@ -245,7 +263,8 @@ factitem fid ctr i accu =
                                   hdlst ++ 
                                   -- (List.foldr (++) "" (List.foldr (factbody "body" ruleid ruleid ctr (bidx,True)) [] l)) 
                                   bodylst in 
-                 let meta = mkskeletons b ruleid in 
+                 -- let meta = mkskeletons b bn ruleid in 
+                 let meta = "" in
                  resultstr ++ meta 
                  -- "" 
       Deny l ->
