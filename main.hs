@@ -342,6 +342,9 @@ dobase i  =
 
 -- debugbase "/Users/vluukkal/src/aspreify/metaeval/hamilton/02052013_234733/output/uncle.lp.reified" "/Users/vluukkal/src/aspreify/metaeval/hamilton/02052013_234733/output/smres1.lp" 
 
+-- 3.3.2013
+-- debugbase "/Users/vluukkal/src/aspreify/metaeval/sample803032013_123155/output/sample8.lp.reified" "/Users/vluukkal/src/aspreify/metaeval/sample803032013_123155/output/smres1.lp" 
+
 -- dereifywithbase = parsenrendernwrite fn1 fn2 (dereifywithbase baserls basehs)
 debugbase basefile cfile = 
     do 
