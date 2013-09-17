@@ -336,6 +336,8 @@ zpredlst(Rid, Z, Pn, v(N+1,Val,v(N,Valold,X)) ) :-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% We construct a list from assertions,
+% starting with the first element. 
 apredlst(Aid,Pn,v(1,Val,nil)) :- 
   assert(Aid), 
   head(Aid,Hid), 
@@ -343,6 +345,10 @@ apredlst(Aid,Pn,v(1,Val,nil)) :-
   alist(Hid,1,Cid),
   cnst(Cid,Val). 
 
+% We grown the list built on other lists 
+% ... problem may be here, we may link  ZZZ
+% the old list to the current list rather than 
+% recombining two lists. 
 apredlst(Aid,Pn,v(N+1,Val,v(N,Valold,X))) :- 
   apredlst(Aid,Pn,v(N,Valold,X)), 
   assert(Aid), 
@@ -361,13 +367,18 @@ nthinapredlst(Aid, Pn, N-1, v(N-1,Val2,Y), v(M,Valold,X) ) :-
   nthinapredlst(Aid, Pn, N, v(N,Val1,v(N-1,Val2,Y)), v(M,Valold,X) ), 
   N - 1 > 0. 
 
+
+% Associate bodypredicates with id Predid and name Pn 
+% with apredlst, which has the same Pn. 
 lmap(Rid,Predid,v(N,Val1,X)) :- 
   apredlst(Aid,Pn,v(N,Val1,X)), 
   bodylist(Rid,I,Predid),
   pred(Predid,Pn),
   arity(Predid,N).
 
-
+% We assign a variable Vn with Val at bodyitem 
+% predid. This comes from a single lmap and hence
+% single apredlst. 
 xassign(Rid,Predid,Vn,Val, v(N,Val1,Rest)) :- 
   % The assignment list from a ground predicate 
   lmap(Rid,Predid,v(N,Val1,Rest)), 
@@ -386,11 +397,12 @@ xconflict(Rid,Vn, Val1, Predid1, Val2, Predid2, X1, X2) :-
 % Conflicting is always relative
 xconflicting(Rid,X1,X2) :- xconflict(Rid,Vn, Val1, Predid1, Val2, Predid2, X1, X2).
 
-xcompatible(Rid,Vn, Val1, X1, X2) :- 
-  xassign(Rid,Predid1,Vn,Val1, X1),
-  xassign(Rid,Predid2,Vn,Val2, X2),
-  X1 != X2,
-  Val1 == Val2. 
+% Something wrong with this below 
+%xcompatible(Rid,Vn, Val1, X1, X2) :- 
+%  xassign(Rid,Predid1,Vn,Val1, X1),
+%  xassign(Rid,Predid2,Vn,Val2, X2),
+%  X1 != X2,
+%  Val1 == Val2. 
 
 visiblexassign(Rid,Vn,Val,X) :- 
   xassign(Rid,Predid,Vn,Val, X), 
@@ -398,13 +410,13 @@ visiblexassign(Rid,Vn,Val,X) :-
   headvarval(Rid,Pn,Bidx,Vn,A,B). 
 
 diffxassign(X1,X2) :- 
-  visiblexassign(Rid,Predid1,Vn,Val1,X1),
-  visiblexassign(Rid,Predid2,Vn,Val2,X2),
+  visiblexassign(Rid,Vn,Val1,X1),
+  visiblexassign(Rid,Vn,Val2,X2),
   Val1 != Val2. 
 
 samexassign(X1,X2) :- 
-  visiblexassign(Rid,Predid1,Vn,Val1,X1),
-  visiblexassign(Rid,Predid2,Vn,Val2,X2),
+  visiblexassign(Rid,Vn,Val1,X1),
+  visiblexassign(Rid,Vn,Val2,X2),
   % X1 != X2, 
   not diffzassign(X1,X2). 
 
@@ -423,12 +435,14 @@ inconsistentxlist(Rid,X) :-
 
 
 % And now form visiblexassign's we collect a new list for the head
-% Later on we can decide whether we call this the apredlist.
+% with predicate name Pn. 
+% This list has index and value Val 
+% 
 % We start with the first item. 
 % We may have to carry the source list with us and then later 
 % project it away. 
-
-% ylist(Rid,Vn,Pn,Predid,Pos) :- 
+% Actually we may not need to do that, but we may need 
+% to check that the lists used are compatible. 
 vlist(Rid,Pn,v(1, Val, nil), X ) :- 
   visiblexassign(Rid,Vn,Val,X),
   % We need the variables bound by Predid. 
@@ -445,9 +459,177 @@ vlist(Rid,Pn,v(N+1, Valnew, v(N, Val, Rest) ), X) :-
   head(Rid,Hid),
   pred(Hid,Pn).
 
+% We combine 'visibleassign/' which relates a variable name (occurring in the head)
+% to a value with other visibleassign/
+% Structure is as follows:
+% Rid			ruleid
+% Pn			name of the predicate 
+% z(Idx,Vn,Val,Predid,Just,Rest) where 
+% Idx 		        index of the list position; this is also the position of the variable in the head
+% Vn			name of the variable 
+% Val 			value of the variable 
+% Predid		the ID of the predicate in the body of Rid
+% X                     the assignment list which produced this assignment,
+%                       maybe needed when the conflicts are resolved
+% nil                   marker for the rest of the v() list.
+%
+% Example of list length 1, the initial list: 
+% 
+% vlist2(8,"reach",z(1,"X","2",15,v(2,"1",v(1,"2",nil)),nil)).
+%
+vlist2(Rid,Pn,z(1, Vn, Val, Predid, X, nil) ) :- 
+  visiblexassign(Rid,Vn,Val,X),
+  % We need the variables bound by Predid. 
+  bodyvarpospre(Rid,Vn,Predid,Pos), 
+  Pos == 1, 
+  head(Rid,Hid),
+  pred(Hid,Pn).
+
+% Build a list iteratively based on the earlier indexes
+%
+% Structure is as follows:
+% Rid			ruleid
+% Pn			name of the predicate 
+% z(N+1, Vnnew, Valnew, Predidnew, X, z(N, Vnold, Valold, Predidold, L, Rest) )
+% N+1 		        index of the new list position
+% Vnnew			name of the variable at this position 
+% Valnew		value of the variable 
+% Predidnew		the ID of the predicate in the body of Rid
+% X                     the assignment list which produced this assignment,
+%                       maybe needed when the conflicts are resolved
+% 
+% The nested z() is the rest of the list, the previous entry based on which 
+% we build the new step
+% z(N, Vnold, Valold, Predidold, L, Rest)
+% N 		        index of the previous list item, must be one smaller than the new one
+% Vnold			name of the variable at this position 
+% Valold		value of the variable 
+% Predidold 		the ID of the predicate in the body of Rid
+% L                     the assignment list which produced this assignment,
+% Rest                  other nested v() lists, may be a nil
+%
+% Example of list length 2
+% vlist2(8,"reach",z(2,"Z","2",12,v(2,"2",v(1,"1",nil)),z(1,"X","1",15,v(2,"2",v(1,"1",nil)),nil))).
+%
+% Some notes: 
+% 1. By construction the Predid is unique to the list and actually specifies the index as
+%    well. 
+% 2. The length of this vlist2 is determined by the number of bodies in the rule Rid. 
+% 3. Two similar variable valuations could come from different assignment lists; the assignmnt 
+%    lists are actually argument lists of ground predicates which are associated with the predid. 
+% 4. The result may still be conflicting. By this construction two consecutive list items 
+%    must have compatible valuation, but the compatibility does not extend through all variable 
+%    valuations; it may be possible to obtain a list with two different values for the same 
+%    variable name. 
+% 5. The assignment list from the ground predicate carries essentially the provenence information. 
+%
+vlist2(Rid,Pn,z(N+1, Vnnew, Valnew, Predidnew, X, z(N, Vnold, Valold, Predidold, L, Rest) ) ) :- 
+  vlist2(Rid,Pn,z(N, Vnold, Valold, Predidold, L, Rest) ), 
+  visiblexassign(Rid,Vnnew,Valnew,X),
+  bodyvarpospre(Rid,Vnnew,Predidnew,N+1), 
+  head(Rid,Hid),
+  pred(Hid,Pn), 
+  % Now make sure that both lists are mutually compatible 
+  not xconflict(Rid,Vnnew, Valnew, Predidnew, Predidold, X, L). 
+  %xcompatible(Rid,Vnnew,Valnew, X, L), 
+  %xcompatible(Rid,Vnold,Valold, L, X). 
+
+
+
+
+
 % And finally, project to apredlst
+%apredlst(Rid,Pn,L) :- 
+%  vlist(Rid,Pn, L, Y ). 
+
+%
+% We need to convert apredlst to vlist2, the forms are like 
+% 
+% apredlst(48,"edge",v(2,"1",v(1,"2",nil))).
+% vlist2(8,"reach",v(2,"Z","2",12,v(2,"2",v(1,"1",nil)),v(1,"X","2",15,v(2,"1",v(1,"2",nil)),nil))).
+%
+
+% Item accessors for vlist2, this is the starting point of the 'iteration', the largest 
+% list item. 
+% 
+% Rid			ruleid
+% Pn			name of the predicate 
+% N                     The index of the following values in the list at indicated position 
+% Vn			name of the variable for this list item  
+% Val 			value of the variable for this list item  
+% Predid		the ID of the predicate in the body of Rid for this list item  
+% SrcL                  the vlist which produced this entry 
+% z(N, Vn, Val, Predid, SrcL, z(N-1, Vnnxt, Valnxt, Predidnxt,SrcLnxt,Rest)) is the copy of the full list. 
+%                       with the next item unfolded. 
+% N                     The index of the last item of the list, i.e the one with 
+%                       the largest bodyindex in the rule Rid. 
+% Vn, Val, Predid, SrcL as above
+% N-1                   The index of the next step, we need to carry this information as cursor
+%                       to the next step. 
+% Vnnxt, Valnxt, Predidnxt, SrcLnxt as above
+% Rest                  Rest of the list unfolded
+% 
+% Example:
+% nthinvlist2(8,"reach",1,"X","2",15,v(2,"3",v(1,"2",nil)),z(2,"Z","2",12,v(2,"2",v(1,"1",nil)),z(2,"X","2",15,v(2,"3",v(1,"2",nil)),nil))). 
+% 
+nthinvlist2(Rid, Pn, N, Vn, Val, Predid, SrcL, 
+	    z(N-1, Vnnxt, Valnxt, Predidnxt,SrcLnxt,Rest), z(N, Vn, Val, Predid, SrcL, z(N-1, Vnnxt, Valnxt, Predidnxt,SrcLnxt,Rest) ) ) 
+:- 
+  vlist2(Rid, Pn, z(N, Vn, Val, Predid, SrcL, z(N-1, Vnnxt, Valnxt, Predidnxt,SrcLnxt,Rest))),
+  bodycount(Rid,N). 
+
+% Here we do the next step, using the previous item as base 
+nthinvlist2(Rid, Pn, N-1, Vn, Val, Predid, SrcL, Rest, Orig )
+:- 
+  nthinvlist2(Rid, Pn, N, Vnold, Valold, Predidold, SrcLold, z(N-1, Vn, Val, Predid,SrcL,Rest), Orig),
+  N > 0. 
+
+% Finally, we need to handle the case of lists of length one 
+nthinvlist2(Rid, Pn, 1, Vn, Val, Predid, SrcL, 
+	    nil, z(1, Vn, Val, Predid, SrcL, nil ) ) 
+:- 
+  vlist2(Rid, Pn, z(1, Vn, Val, Predid, SrcL, nil )),
+  bodycount(Rid,1). 
+
+
+
+% Here we search for two consecutive versions of the same list 
+%samenthvlist2(Rid,N,M, X,Y) :- 
+%  nthinvlist2(Rid, Pn, N, Vn, Val, Predid, SrcL, Cursor1, X), 
+%  nthinvlist2(Rid, Pn, M, Vn2, Val2, Predid2, SrcL2, Cursor2, Y),
+%  N != M, 
+%  X == Y.
+
+%
+% Now construct vlist3, which removes extra stuff from vlist2, so that
+% we can regenerate apredlst.
+%
+% vlist3(Rid,Pn,v(N,Val,v(N-1,Val,nil)), L)
+% Rid			ruleid
+% Pn			name of the predicate 
+% v(N,Val,v(N-1,Val,nil))  a nested list 
+% L                     The source of this valuation, which we use to 
+%                       glue two items of vlist2
+
+% The first item 
+vlist3(Rid,Pn,v(1,Val,nil), L) :- 
+  nthinvlist2(Rid,Pn,1,Vn,Val,Predid,GroundL,Item,L). 
+
+%vlist3(Rid,Pn, v(N,Val,v(N-1,Valprev,Rest)) ,L) :- 
+%  vlist3(Rid,Pn,v(N-1,Valprev,Rest), L), 
+%  nthinvlist2(Rid,Pn,N,Vn,Val,Predid,L1,L). 
+
+vlist3(Rid,Pn,v(N+1,Val,v(N,Prevval,Rest)), L) :- 
+  % Get the previous value for this list 
+  vlist3(Rid,Pn,v(N,Prevval,Rest),L),
+  % Get the current values for this list 
+  nthinvlist2(Rid,Pn,N+1,Vn,Val,Predid,GroundL,Item,L). 
+
+% Next project vlist3 to apredlst to be available 
+% as a ground fact. 
+% This also removes duplicate value assignments. 
 apredlst(Rid,Pn,L) :- 
-  vlist(Rid,Pn, L, Y ). 
+  vlist3(Rid,Pn, L, Y ). 
 
 % And if the rule is evaluable, we project it to ground rule,
 % we could also mkassign it, perhaps to reuse old code of the dereifier
@@ -459,17 +641,13 @@ groundrule(Pn,v(N,Val,Rest)) :-
   arity(Hid,N), 
   evaluable(Rid). 
 
-
-
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% Duplicate of what? XXX
 duplicate(Rid,Y) :- 
   apredlst(Aid,Pn, v(N,Valold,X) ),
   zpredlst(Rid, Y, Pn, v(N,Valold,X) ),
   bodycount(Rid,N). 
-
-   
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
