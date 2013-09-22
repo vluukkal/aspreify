@@ -376,6 +376,11 @@ lmap(Rid,Predid,v(N,Val1,X)) :-
   pred(Predid,Pn),
   arity(Predid,N).
 
+% Mark a negated bodyitem with list nil. 
+lmap(Rid,Predid,nil) :- 
+  bodylist(Rid,I,Predid),
+  neg(Predid). 
+
 % We assign a variable Vn with Val at bodyitem 
 % predid. This comes from a single lmap and hence
 % single apredlst. 
@@ -642,6 +647,7 @@ groundrule(Pn,v(N,Val,Rest)) :-
 
 % First make a list of mappings for each of the 
 % bodies in a rule.
+% We handle the first case here. 
 flist(Rid,f(1, Bpredid, Vlist, nil) ) :- 
   bodylist(Rid,1,Bpredid), 
   lmap(Rid,Bpredid,Vlist). 
@@ -675,7 +681,7 @@ nthinflist(Rid, N-1, Predid, SrcL, Rest, Orig )
 % Finally, we need to handle the case of lists of length one 
 nthinflist(Rid, 1, Predid, SrcL, nil, f(1, Predid, SrcL, nil ) ) 
 :- 
-  flist(Rid, Pn, z(1, Predid, SrcL, nil )),  % Not working due to z()
+  flist(Rid, f(1, Predid, SrcL, nil )),  % Not working due to z()
   bodycount(Rid,1). 
 
 %
@@ -796,15 +802,6 @@ apredlst(Id,Pn,v(N+1,Val1,v(N,Valold,Rest)) ) :-
 % When we start from the first one, there are no 
 % unknowns. 
 % Later we project bodylist/3 to body/2. 
-tmpprotobodylist(Rid, 1, A2, Predid, id(Id,1), id(Id,1+A+1), Id) :- 
-  prnonevaluable(Rid), 
-  not cflctrassign(Rid,Id), 
-  rassign(Rid,Vn,Val1,Id),
-  head(Rid,Hd), 
-  arity(Hd,A),              % Arity A means that there been 1+A new IDs for the head
-  bodylist(Rid,1,Predid),   % we start with the first item of the bodylist 
-  arity(Predid,A2). 
-
 protobodylist(Rid, N, A2, Predid, id(Id,1), id(Id,Predid), Id) :- 
   prnonevaluable(Rid), 
   not cflctrassign(Rid,Id), 
@@ -813,24 +810,6 @@ protobodylist(Rid, N, A2, Predid, id(Id,1), id(Id,Predid), Id) :-
   arity(Hd,A),              % Arity A means that there been 1+A new IDs for the head
   bodylist(Rid,N,Predid),   % we start with the first item of the bodylist 
   arity(Predid,A2). 
-
-
-
-
-
-% Now we create the next bodylist, based on the previous one so that 
-% we know the ID of the previous bodylist. With this we can build 
-% the next counters for this item. 
-tmpprotobodylist(Rid, N+1, A2, Predid, id(Id,1), id(Id,PrevBodyctr+A2+1), Id) :- 
-  protobodylist(Rid, N, A2old, Predidold, id(Id,1), id(Id,PrevBodyctr), Id), 
-  prnonevaluable(Rid), 
-  not cflctrassign(Rid,Id), 
-  rassign(Rid,Vn,Val1,Id),
-  % 
-  bodylist(Rid,N+1,Predid),   % we start with the first item of the bodylist 
-  arity(Predid,A2). 
-
-
 
 bodylist(id(Id,0), N, id(Id,X) ) :- 
   protobodylist(Rid, N, A2, Predid, id(Id,Z), id(Id,X), Id). 
@@ -843,6 +822,15 @@ body(id(Id,0),id(Id,X)) :-
 pred(id(Id,Bodyctr), Pn ) :- 
   protobodylist(Rid, N, Arity, Predid, id(Id,Rlctr), id(Id,Bodyctr), Id), 
   pred(Predid,Pn). 
+
+pos(id(Id,Bodyctr)) :- 
+  protobodylist(Rid, N, Arity, Predid, id(Id,Rlctr), id(Id,Bodyctr), Id), 
+  pos(Predid). 
+
+neg(id(Id,Bodyctr)) :- 
+  protobodylist(Rid, N, Arity, Predid, id(Id,Rlctr), id(Id,Bodyctr), Id), 
+  neg(Predid). 
+
 
 % zalist(id(Id,Bodyctr),N,id(Id,Bodyctr+N)) :- 
 alist(id(Id,Bodyctr),N,id(Id,Vid)) :- 
