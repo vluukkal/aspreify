@@ -113,6 +113,15 @@ bodyvarpospre(Rid,Vn,Predid,Idx) :-
   alist(Predid,Idx,Vid), 
   var(Vid,Vn). 
 
+% Make one for constraints 
+bodyvarpospre(Rid,Vn,Predid,Idx) :- 
+  constraint(Rid), 
+  bodylist(Rid,Bidx,Predid),
+  pred(Predid,Pn), 
+  alist(Predid,Idx,Vid), 
+  var(Vid,Vn). 
+
+
 one(1). 
 
 % This produces the same value for nxtctr many times over. 
@@ -391,6 +400,9 @@ xassign(Rid,Predid,Vn,Val, v(N,Val1,Rest)) :-
   bodyvarpospre(Rid,Vn,Predid,Pos),
   % We need to get the value at position Pos and it is 
   % coming from some ground fact Aid
+  % Or anything associated with apredlst. 
+  % Starting up Aid is an existing assertion, but later 
+  % on it may be a generated ID. 
   nthinapredlst(Aid,Pn,Pos, v(Pos,Val,X), v(N,Val1,Rest)).
 
 
@@ -725,6 +737,13 @@ hasrule(1,id(Id,0)) :-
 
 rule(id(Id,0)) :- 
   prnonevaluable(Rid), 
+  not constraint(Rid), 
+  not cflctrassign(Rid,Id), 
+  rassign(Rid,Vn,Val1,Id).      % This is needed to access the ID 
+
+constraint(id(Id,0)) :- 
+  prnonevaluable(Rid), 
+  constraint(Rid), 
   not cflctrassign(Rid,Id), 
   rassign(Rid,Vn,Val1,Id).      % This is needed to access the ID 
   
@@ -735,16 +754,19 @@ newname(id(Id,0),"HUU",Rid) :-
 
 pos(id(Id,1)) :- 
   prnonevaluable(Rid), 
+  not constraint(Rid), 
   not cflctrassign(Rid,Id), 
   rassign(Rid,Vn,Val1,Id). 
 
 head(id(Id,0),id(Id,1)) :- 
   prnonevaluable(Rid), 
+  not constraint(Rid), 
   not cflctrassign(Rid,Id), 
   rassign(Rid,Vn,Val1,Id). 
 
 pred(id(Id,1), Pn ) :- 
   prnonevaluable(Rid), 
+  not constraint(Rid), 
   not cflctrassign(Rid,Id), 
   rassign(Rid,Vn,Val1,Id),
   head(Rid,Hid), 
@@ -753,6 +775,7 @@ pred(id(Id,1), Pn ) :-
 % Now dig the variables and combine with rassign 
 alist(id(Id,1),N,id(Id,1+N)) :- 
   prnonevaluable(Rid), 
+  not constraint(Rid), 
   not cflctrassign(Rid,Id), 
   head(Rid,Hid), 
   alist(Hid,N,Vid),
@@ -761,6 +784,7 @@ alist(id(Id,1),N,id(Id,1+N)) :-
 
 cnst(id(Id,1+N),Val1) :- 
   prnonevaluable(Rid), 
+  not constraint(Rid), 
   not cflctrassign(Rid,Id), 
   rassign(Rid,Vn,Val1,Id),
   head(Rid,Hid), 
@@ -770,6 +794,7 @@ cnst(id(Id,1+N),Val1) :-
 % Make an apredlist still out of this. 
 apredlst(Id,Pn,v(1,Val1,nil) ) :- 
   prnonevaluable(Rid), 
+  not constraint(Rid), 
   not cflctrassign(Rid,Id), 
   rassign(Rid,Vn,Val1,Id),
   head(Rid,Hid), 
@@ -779,6 +804,7 @@ apredlst(Id,Pn,v(1,Val1,nil) ) :-
 
 apredlst(Id,Pn,v(N+1,Val1,v(N,Valold,Rest)) ) :- 
   apredlst(Id,Pn,v(N,Valold,Rest) ), 
+  not constraint(Rid), 
   prnonevaluable(Rid), 
   not cflctrassign(Rid,Id), 
   rassign(Rid,Vn,Val1,Id),
@@ -806,10 +832,13 @@ protobodylist(Rid, N, A2, Predid, id(Id,1), id(Id,Predid), Id) :-
   prnonevaluable(Rid), 
   not cflctrassign(Rid,Id), 
   rassign(Rid,Vn,Val1,Id),
-  head(Rid,Hd), 
-  arity(Hd,A),              % Arity A means that there been 1+A new IDs for the head
+  %head(Rid,Hd), 
+  %arity(Hd,A),              % Arity A means that there been 1+A new IDs for the head
   bodylist(Rid,N,Predid),   % we start with the first item of the bodylist 
   arity(Predid,A2). 
+
+
+
 
 bodylist(id(Id,0), N, id(Id,X) ) :- 
   protobodylist(Rid, N, A2, Predid, id(Id,Z), id(Id,X), Id). 
