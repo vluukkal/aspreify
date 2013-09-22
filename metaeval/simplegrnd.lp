@@ -535,13 +535,6 @@ vlist2(Rid,Pn,z(N+1, Vnnew, Valnew, Predidnew, X, z(N, Vnold, Valold, Predidold,
   %xcompatible(Rid,Vnold,Valold, L, X). 
 
 
-
-
-
-% And finally, project to apredlst
-%apredlst(Rid,Pn,L) :- 
-%  vlist(Rid,Pn, L, Y ). 
-
 %
 % We need to convert apredlst to vlist2, the forms are like 
 % 
@@ -641,13 +634,256 @@ groundrule(Pn,v(N,Val,Rest)) :-
   arity(Hid,N), 
   evaluable(Rid). 
 
+%%%%%%%%%%%%%%%%%%%%
+% Below we have essentially the same as vlist2, but with all the variables
+% not just those in the head.
+% xassign(8,12,"Y","1",v(2,"2",v(1,"1",nil))).
+%%%%%%%%%%%%%%%%%%%%
+
+% First make a list of mappings for each of the 
+% bodies in a rule.
+flist(Rid,f(1, Bpredid, Vlist, nil) ) :- 
+  bodylist(Rid,1,Bpredid), 
+  lmap(Rid,Bpredid,Vlist). 
+
+% Then combine with others
+% This contains all of the possible permutations,
+% we might want to check the immediate compatibility 
+% at ths step.
+% There is xconflicting, but we'd need to access the 
+% lists via xconflict. 
+% Other, easier, way is to check the conflict between 
+% the Predid,Groundid pairs. This could exist. 
+flist(Rid, f(N+1, Bpredidnew, Vlistnew, f(N, Bpredidold, Vlistold, Rest) ) ) :- 
+  flist(Rid,f(N, Bpredidold, Vlistold, Rest) ), 
+  bodylist(Rid,N+1,Bpredidnew), 
+  lmap(Rid,Bpredidnew,Vlistnew). 
+
+% Accessors for the flist/
+nthinflist(Rid, N, Bpredid, Vlist, f(N-1, Bpredidnxt, Vlistnxt, Rest), 
+	     f(N, Bpredid, Vlist, f(N-1, Bpredidnxt, Vlistnxt, Rest)))
+:- 
+  flist(Rid, f(N, Bpredid, Vlist, f(N-1, Bpredidnxt, Vlistnxt, Rest))),
+  bodycount(Rid,N). 
+
+% Here we do the next step, using the previous item as base 
+nthinflist(Rid, N-1, Predid, SrcL, Rest, Orig )
+:- 
+  nthinflist(Rid, N, Bpredidold, Srclold, f(N-1,Predid,SrcL,Rest), Orig),
+  N > 0. 
+
+% Finally, we need to handle the case of lists of length one 
+nthinflist(Rid, 1, Predid, SrcL, nil, f(1, Predid, SrcL, nil ) ) 
+:- 
+  flist(Rid, Pn, z(1, Predid, SrcL, nil )),  % Not working due to z()
+  bodycount(Rid,1). 
+
+%
+% Now produce a variable mapping which may be inconsistent
+% Rid 	      		 rule ID
+% Vn			 variable name 
+% Val			 variable value
+% L			 the source flist, which contains all 
+% 			 of the mappings to rulebodies. 
+% 
+rassign(Rid,Vn,Val,L) :- 
+  xassign(Rid,Predid,Vn,Val,GL), % GL is the list produced by a ground fact 
+  nthinflist(Rid,N,Predid,GL,Tmp,L). 
+  % bodycount(Rid,N). % We force this to use a list which has assignments for all 
+  % perhaps not a good idea 
+
+% Compatibility between two assignments 
+% cflctrassign(Rid,Vn,Val1,Val2,L) :- 
+cflctrassign(Rid,L) :- 
+  rassign(Rid,Vn,Val1,L), 
+  rassign(Rid,Vn,Val2,L),
+  Val1 != Val2.
+
+% Debugging tool, not really needed ...
+cleanrassign(Rid,L) :- 
+  rassign(Rid,Vn,Val1,L), 
+  not cflctrassign(Rid,L). 
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Now we are ready to try to tackle nonevaluable rules
+% hamilton_toground.lp.reified as example. 
+
+% First let's generate a head 
+hasrule(1,id(Id,0)) :- 
+  prnonevaluable(Rid), 
+  not cflctrassign(Rid,Id), 
+  rassign(Rid,Vn,Val1,Id).      % This is needed to access the ID 
+
+rule(id(Id,0)) :- 
+  prnonevaluable(Rid), 
+  not cflctrassign(Rid,Id), 
+  rassign(Rid,Vn,Val1,Id).      % This is needed to access the ID 
+  
+newname(id(Id,0),"HUU",Rid) :- 
+  prnonevaluable(Rid), 
+  not cflctrassign(Rid,Id), 
+  rassign(Rid,Vn,Val1,Id). 
+
+pos(id(Id,1)) :- 
+  prnonevaluable(Rid), 
+  not cflctrassign(Rid,Id), 
+  rassign(Rid,Vn,Val1,Id). 
+
+head(id(Id,0),id(Id,1)) :- 
+  prnonevaluable(Rid), 
+  not cflctrassign(Rid,Id), 
+  rassign(Rid,Vn,Val1,Id). 
+
+pred(id(Id,1), Pn ) :- 
+  prnonevaluable(Rid), 
+  not cflctrassign(Rid,Id), 
+  rassign(Rid,Vn,Val1,Id),
+  head(Rid,Hid), 
+  pred(Hid,Pn). 
+
+% Now dig the variables and combine with rassign 
+alist(id(Id,1),N,id(Id,1+N)) :- 
+  prnonevaluable(Rid), 
+  not cflctrassign(Rid,Id), 
+  head(Rid,Hid), 
+  alist(Hid,N,Vid),
+  var(Vid,Vn),
+  rassign(Rid,Vn,Val1,Id). 
+
+cnst(id(Id,1+N),Val1) :- 
+  prnonevaluable(Rid), 
+  not cflctrassign(Rid,Id), 
+  rassign(Rid,Vn,Val1,Id),
+  head(Rid,Hid), 
+  alist(Hid,N,Vid),
+  var(Vid,Vn).
+  
+% Make an apredlist still out of this. 
+apredlst(Id,Pn,v(1,Val1,nil) ) :- 
+  prnonevaluable(Rid), 
+  not cflctrassign(Rid,Id), 
+  rassign(Rid,Vn,Val1,Id),
+  head(Rid,Hid), 
+  pred(Hid,Pn),
+  alist(Hid,1,Vid),
+  var(Vid,Vn).
+
+apredlst(Id,Pn,v(N+1,Val1,v(N,Valold,Rest)) ) :- 
+  apredlst(Id,Pn,v(N,Valold,Rest) ), 
+  prnonevaluable(Rid), 
+  not cflctrassign(Rid,Id), 
+  rassign(Rid,Vn,Val1,Id),
+  head(Rid,Hid), 
+  pred(Hid,Pn),
+  alist(Hid,N+1,Vid),
+  var(Vid,Vn).
+
+
+
+%arity(id(Id,1),A) :- 
+%  prnonevaluable(Rid), 
+%  not cflctrassign(Rid,Id), 
+%  head(Rid,Hd), 
+%  arity(Hd,A), 
+%  rassign(Rid,Vn,Val1,Id). 
+
+% Next an item in the body
+% In order to be able to count the values of the 
+% new indexes we must know the previous ones.
+% When we start from the first one, there are no 
+% unknowns. 
+% Later we project bodylist/3 to body/2. 
+tmpprotobodylist(Rid, 1, A2, Predid, id(Id,1), id(Id,1+A+1), Id) :- 
+  prnonevaluable(Rid), 
+  not cflctrassign(Rid,Id), 
+  rassign(Rid,Vn,Val1,Id),
+  head(Rid,Hd), 
+  arity(Hd,A),              % Arity A means that there been 1+A new IDs for the head
+  bodylist(Rid,1,Predid),   % we start with the first item of the bodylist 
+  arity(Predid,A2). 
+
+protobodylist(Rid, N, A2, Predid, id(Id,1), id(Id,Predid), Id) :- 
+  prnonevaluable(Rid), 
+  not cflctrassign(Rid,Id), 
+  rassign(Rid,Vn,Val1,Id),
+  head(Rid,Hd), 
+  arity(Hd,A),              % Arity A means that there been 1+A new IDs for the head
+  bodylist(Rid,N,Predid),   % we start with the first item of the bodylist 
+  arity(Predid,A2). 
+
+
+
+
+
+% Now we create the next bodylist, based on the previous one so that 
+% we know the ID of the previous bodylist. With this we can build 
+% the next counters for this item. 
+tmpprotobodylist(Rid, N+1, A2, Predid, id(Id,1), id(Id,PrevBodyctr+A2+1), Id) :- 
+  protobodylist(Rid, N, A2old, Predidold, id(Id,1), id(Id,PrevBodyctr), Id), 
+  prnonevaluable(Rid), 
+  not cflctrassign(Rid,Id), 
+  rassign(Rid,Vn,Val1,Id),
+  % 
+  bodylist(Rid,N+1,Predid),   % we start with the first item of the bodylist 
+  arity(Predid,A2). 
+
+
+
+bodylist(id(Id,0), N, id(Id,X) ) :- 
+  protobodylist(Rid, N, A2, Predid, id(Id,Z), id(Id,X), Id). 
+
+body(id(Id,0),id(Id,X)) :- 
+  protobodylist(Rid, N, A2, Predid, id(Id,Z), id(Id,X), Id). 
+
+
+% Now create the predicate
+pred(id(Id,Bodyctr), Pn ) :- 
+  protobodylist(Rid, N, Arity, Predid, id(Id,Rlctr), id(Id,Bodyctr), Id), 
+  pred(Predid,Pn). 
+
+% zalist(id(Id,Bodyctr),N,id(Id,Bodyctr+N)) :- 
+alist(id(Id,Bodyctr),N,id(Id,Vid)) :- 
+  protobodylist(Rid, Bodyid, Arity, Predid, id(Id,Rlctr), id(Id,Bodyctr), Id),
+  alist(Predid,N,Vid).
+
+cnst(id(Id,Bodyctr+N),Val1) :- 
+  protobodylist(Rid, Bodyid, Arity, Predid, id(Id,Rlctr), id(Id,Bodyctr), Id), 
+  rassign(Rid,Vn,Val1,Id),
+  alist(Predid,N,Vid), 
+  var(Vid,Vn).
+
+
+
+% Now dig the variables and combine with rassign 
+%alist(id(Id,1),N,id(Id,1+N)) :- 
+%  prnonevaluable(Rid), 
+% not cflctrassign(Rid,Id), 
+% head(Rid,Hid), 
+%  alist(Hid,N,Vid),
+%  var(Vid,Vn),
+%  rassign(Rid,Vn,Val1,Id). 
+
+%cnst(id(Id,1+N),Val1) :- 
+%  prnonevaluable(Rid), 
+%  not cflctrassign(Rid,Id), 
+%  rassign(Rid,Vn,Val1,Id),
+%  head(Rid,Hid), 
+%  alist(Hid,N,Vid),
+%  var(Vid,Vn).
+
+
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Duplicate of what? XXX
-duplicate(Rid,Y) :- 
-  apredlst(Aid,Pn, v(N,Valold,X) ),
-  zpredlst(Rid, Y, Pn, v(N,Valold,X) ),
-  bodycount(Rid,N). 
+%duplicate(Rid,Y) :- 
+%  apredlst(Aid,Pn, v(N,Valold,X) ),
+%  zpredlst(Rid, Y, Pn, v(N,Valold,X) ),
+%  bodycount(Rid,N). 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
