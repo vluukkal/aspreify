@@ -148,15 +148,15 @@ onerule(Rid,One) :-
   one(One),
   rule(Rid). 
 
-onerulemap(Rid,Bidx,Predid,Jid,One) :- 
-  one(One),
-  rule(Rid), 
-  bodylist(Rid,Bidx,Predid),
-  pred(Predid,Pn),
-  assert(Aid), 
-  head(Aid,Jid),
-  % freectr(Ctr), 
-  pred(Jid,Pn).
+%onerulemap(Rid,Bidx,Predid,Jid,One) :- 
+%  one(One),
+%  rule(Rid), 
+%  bodylist(Rid,Bidx,Predid),
+%  pred(Predid,Pn),
+%  assert(Aid), 
+%  head(Aid,Jid),
+%  % freectr(Ctr), 
+%  pred(Jid,Pn).
   
 
 
@@ -270,17 +270,17 @@ potential(Rid,Lid) :-
 %  onerulemap(Rid,1,Predid,Jid,One). 
 
 % Lets create an entry for the max bodylist 
-zlist(Rid,1,c(1,Predid,Jid,nil)) :-
-  onerulemap(Rid,1,Predid,Jid,One). 
+%zlist(Rid,1,c(1,Predid,Jid,nil)) :-
+%  onerulemap(Rid,1,Predid,Jid,One). 
 
 % Recursively grow the list 
-zlist(Rid, N+1, c(N+1,Predid,Jid,c(N, Predidold,Jidold,X)) ) :- 
-  zlist(Rid, N,c(N,Predidold,Jidold,X)),
-  onerulemap(Rid,N+1,Predid,Jid,One),
-  bodycount(Rid,Bc), 
-  consistentassignments(Rid,N+1,Jid,N,Jidold), 
-  % Consistency should check that the predicate names match 
-  N < Bc. 
+%zlist(Rid, N+1, c(N+1,Predid,Jid,c(N, Predidold,Jidold,X)) ) :- 
+%  zlist(Rid, N,c(N,Predidold,Jidold,X)),
+%  onerulemap(Rid,N+1,Predid,Jid,One),
+%  bodycount(Rid,Bc), 
+%  consistentassignments(Rid,N+1,Jid,N,Jidold), 
+%  % Consistency should check that the predicate names match 
+%  N < Bc. 
 
 % We keep the whole list in the last argument 
 nthinzlist(Rid, c(N, Predid,Jid,X), c(N, Predid,Jid,X) ) :- 
@@ -390,6 +390,13 @@ lmap(Rid,Predid,nil) :-
   bodylist(Rid,I,Predid),
   neg(Predid). 
 
+% Mark a bexpr/ bodyitem as nil
+lmap(Rid,Predid,nil) :- 
+  bodylist(Rid,I,Predid),
+  bexpr(Rid,Predid). 
+
+
+
 % We assign a variable Vn with Val at bodyitem 
 % predid. This comes from a single lmap and hence
 % single apredlst. 
@@ -435,7 +442,7 @@ samexassign(X1,X2) :-
   visiblexassign(Rid,Vn,Val1,X1),
   visiblexassign(Rid,Vn,Val2,X2),
   % X1 != X2, 
-  not diffzassign(X1,X2). 
+  not diffxassign(X1,X2). 
 
 inconsistentxlist(Rid,X) :- 
   xassign(Rid,Predid1,Vn,Val1,X), 
@@ -716,6 +723,56 @@ cflctrassign(Rid,L) :-
   rassign(Rid,Vn,Val1,L), 
   rassign(Rid,Vn,Val2,L),
   Val1 != Val2.
+
+% Purpose made for !=, could we modularize?
+cflctrassign(Rid,L) :- 
+  rassign(Rid,Vnl,Vall,L), 
+  rassign(Rid,Vnr,Valr,L),
+  % Get the bexpr 
+  bexpr(Rid,Bid), 
+  larg(Bid,Left), 
+  rarg(Bid,Right), 
+  var(Left,Vnl),
+  var(Right,Vnr), 
+  bop(Bid,"!="),
+  Vall == Valr. 
+
+cflctrassign(Rid,L) :- 
+  rassign(Rid,Vnl,Vall,L), 
+  rassign(Rid,Vnr,Valr,L),
+  % Get the bexpr 
+  bexpr(Rid,Bid), 
+  larg(Bid,Left), 
+  rarg(Bid,Right), 
+  var(Left,Vnl),
+  var(Right,Vnr), 
+  bop(Bid,"=="),
+  Vall != Valr. 
+
+cflctrassign(Rid,L) :- 
+  rassign(Rid,Vnl,Vall,L), 
+  rassign(Rid,Vnr,Valr,L),
+  % Get the bexpr 
+  bexpr(Rid,Bid), 
+  larg(Bid,Left), 
+  rarg(Bid,Right), 
+  var(Left,Vnl),
+  var(Right,Vnr), 
+  bop(Bid,">"),
+  Vall <= Valr. 
+
+cflctrassign(Rid,L) :- 
+  rassign(Rid,Vnl,Vall,L), 
+  rassign(Rid,Vnr,Valr,L),
+  % Get the bexpr 
+  bexpr(Rid,Bid), 
+  larg(Bid,Left), 
+  rarg(Bid,Right), 
+  var(Left,Vnl),
+  var(Right,Vnr), 
+  bop(Bid,"<"),
+  Vall >= Valr. 
+
 
 % Debugging tool, not really needed ...
 cleanrassign(Rid,L) :- 
@@ -1559,3 +1616,7 @@ evaluable(Rid) :-
 #show var/2. 
 #show cnst/2. 
 #show body/2. 
+#show bexpr/2.
+#show bop/2.
+#show larg/2.
+#show rarg/2.
