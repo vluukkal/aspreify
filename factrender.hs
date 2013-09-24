@@ -522,8 +522,9 @@ typeargs ruleid parentid ctr (idx,useidx) a =
     if length a == 0 
     then [""]
     else 
+        let numtypes = List.length a in 
         let (res,ids) = List.foldl typelist ([],0) a in 
-          (["rulecomposite(" ++ show(ruleid) ++ "," ++ show(parentid) ++ ").\n"] ++ res)
+          (["rulecomposite(" ++ show(ruleid) ++ "," ++ show(parentid) ++ ").\ncompositenum(" ++ show(parentid) ++ "," ++ show(numtypes) ++ ").\n"] ++ res)
     where 
       typelist (accu,previd) i = 
           -- let argid = (myrand())::Int in 
