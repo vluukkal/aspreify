@@ -49,6 +49,26 @@ bodyvarpospre(Rid,Vn,Predid,Idx) :-
   alist(Predid,Idx,Vid), 
   var(Vid,Vn). 
 
+% These are particular to the typed lists or parametrized 
+% conjucntions. 
+tvarpos(Compid,Vn,Bidx,Idx) :- 
+  composite(Compid), 
+  tlist(Compid,Bidx,Qid),
+  qual(Qid,Predid),
+  pred(Predid,Pn), 
+  alist(Predid,Idx,Vid), 
+  var(Vid,Vn). 
+
+tvarpospre(Compid,Vn,Predid,Idx) :- 
+  composite(Compid), 
+  tlist(Compid,Bidx,Qid),
+  qual(Qid,Predid),
+  pred(Predid,Pn), 
+  alist(Predid,Idx,Vid), 
+  var(Vid,Vn). 
+
+
+
 % Make one for constraints 
 bodyvarpospre(Rid,Vn,Predid,Idx) :- 
   constraint(Rid), 
@@ -117,6 +137,15 @@ lmap(Rid,Predid,v(N,Val1,X)) :-
   pred(Predid,Pn),
   arity(Predid,N).
 
+% Associate an entry on the conjunction list here 
+lmap(Conjid, Predid, v(N,Val1,X)) :- 
+  apredlst(Aid,Pn,v(N,Val1,X)), 
+  composite(Conjid),
+  tlist(Conjid,I,Qid),
+  qual(Qid,Predid), 
+  pred(Predid,Pn),
+  arity(Predid,N).
+
 % Mark a negated bodyitem with list nil. 
 lmap(Rid,Predid,nil) :- 
   bodylist(Rid,I,Predid),
@@ -126,6 +155,11 @@ lmap(Rid,Predid,nil) :-
 lmap(Rid,Predid,nil) :- 
   bodylist(Rid,I,Predid),
   bexpr(Rid,Predid). 
+
+% Mark a composite bodyitem with list nil. 
+lmap(Rid,Predid,nil) :- 
+  bodylist(Rid,I,Predid),
+  composite(Predid). 
 
 
 
@@ -185,6 +219,24 @@ inconsistentxlist(Rid,X) :-
 %  not inconsistentxlist(Rid, X), 
 %  bodycount(Rid,Len), 
 %  zlist(Rid,Len,X).
+
+% A version of tassign for conjunctive lists 
+tassign(Rid,Predid,Vn,Val, v(N,Val1,Rest)) :- 
+  % The assignment list from a ground predicate 
+  lmap(Rid,Predid,v(N,Val1,Rest)), 
+  % We need the variables bound by Predid. 
+  tvarpospre(Rid,Vn,Predid,Pos),
+  % Starting up Aid is an existing assertion, but later 
+  % on it may be a generated ID. 
+  nthinapredlst(Aid,Pn,Pos, v(Pos,Val,X), v(N,Val1,Rest)).
+
+tconflict(Rid,Vn, Val1, Predid1, Val2, Predid2, X1, X2) :- 
+  tassign(Rid,Predid1,Vn,Val1, X1),
+  tassign(Rid,Predid2,Vn,Val2, X2),
+  Val1 != Val2. 
+
+
+
 
 % Now we need to tag one assigned xassign 
 % as a selection.   
@@ -436,6 +488,53 @@ nthinflist(Rid, 1, Predid, SrcL, nil, f(1, Predid, SrcL, nil ) )
   flist(Rid, f(1, Predid, SrcL, nil )),  % Not working due to z()
   bodycount(Rid,1). 
 
+% Now we replicate flist for the typed list thingy 
+
+% First make a list of mappings for each of the 
+% predicates in typed lists. 
+% We handle the first case here. 
+typedlist(Rid,f(1, Bpredid, Vlist, nil) ) :- 
+  tlist(Rid,1,Qid), 
+  qual(Qid,Bpredid), 
+  lmap(Rid,Bpredid,Vlist). 
+
+% Then combine with others
+% This contains all of the possible permutations,
+% we might want to check the immediate compatibility 
+% at ths step.
+% There is xconflicting, but we'd need to access the 
+% lists via xconflict. 
+% Other, easier, way is to check the conflict between 
+% the Predid,Groundid pairs. This could exist. 
+typedlist(Rid, f(N+1, Bpredidnew, Vlistnew, f(N, Bpredidold, Vlistold, Rest) ) ) :- 
+  typedlist(Rid,f(N, Bpredidold, Vlistold, Rest) ), 
+  tlist(Rid,N+1,Qid), 
+  qual(Qid,Bpredidnew),
+  lmap(Rid,Bpredidnew,Vlistnew). 
+
+% Accessors for the flist/
+nthintypedlist(Rid, N, Bpredid, Vlist, f(N-1, Bpredidnxt, Vlistnxt, Rest), 
+	     f(N, Bpredid, Vlist, f(N-1, Bpredidnxt, Vlistnxt, Rest)))
+:- 
+  typedlist(Rid, f(N, Bpredid, Vlist, f(N-1, Bpredidnxt, Vlistnxt, Rest))),
+  % bodycount(Rid,N). 
+  compositenum(Rid,N). 
+
+% Here we do the next step, using the previous item as base 
+nthintypedlist(Rid, N-1, Predid, SrcL, Rest, Orig )
+:- 
+  nthintypedlist(Rid, N, Bpredidold, Srclold, f(N-1,Predid,SrcL,Rest), Orig),
+  N > 0. 
+
+% Finally, we need to handle the case of lists of length one 
+%nthintypedlist(Rid, 1, Predid, SrcL, nil, f(1, Predid, SrcL, nil ) ) 
+%:- 
+%  nthintypedlist(Rid, f(1, Predid, SrcL, nil )),  % Not working due to z()
+%  compositenum(Rid,1). 
+
+
+
+
 %
 % Now produce a variable mapping which may be inconsistent
 % Rid 	      		 rule ID
@@ -512,8 +611,39 @@ cleanrassign(Rid,L) :-
   rassign(Rid,Vn,Val1,L), 
   not cflctrassign(Rid,L). 
 
+%
+% Now produce a variable mapping for the conjunctions. This 
+% mirrors rassign/. 
+% The assignments may be inconsistent internally or wrt. 
+% rassign.
+% 
+% Rid 	      		 rcomposite ID
+% Vn			 variable name 
+% Val			 variable value
+% L			 the source flist, which contains all 
+% 			 of the mappings to rulebodies. 
+% 
+testassign(Rid,Vn,Val,L) :- 
+  tassign(Rid,Predid,Vn,Val,GL), % GL is the list produced by a ground fact 
+  nthintypedlist(Rid,N,Predid,GL,Tmp,L). 
+  % bodycount(Rid,N). % We force this to use a list which has assignments for all 
+  % perhaps not a good idea 
 
+cflcttestassign(Rid,L) :- 
+  testassign(Rid,Vn,Val1,L), 
+  testassign(Rid,Vn,Val2,L),
+  Val1 != Val2.
 
+% Now we match testassign/ s with xassigns
+% which provide the binding within the rule.
+compatibletandx(Rid,Compoundid,Xa,Ta) :- 
+  testassign(Compoundid,Vn,Val1,Ta), 
+  not cflcttestassign(Compoundid,Ta),
+  rassign(Rid,Vn,Val1,Xa), 
+  not cflctrassign(Compoundid,Ta),
+  % They agree on varaibles
+  % They must be connected 
+  rulecomposite(Rid,Compoundid). 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Now we are ready to try to tackle nonevaluable rules
@@ -627,15 +757,11 @@ protobodylist(Rid, N, A2, Predid, id(Id,1), id(Id,Predid), Id) :-
   bodylist(Rid,N,Predid),   % we start with the first item of the bodylist 
   arity(Predid,A2). 
 
-
-
-
 bodylist(id(Id,0), N, id(Id,X) ) :- 
   protobodylist(Rid, N, A2, Predid, id(Id,Z), id(Id,X), Id). 
 
 body(id(Id,0),id(Id,X)) :- 
   protobodylist(Rid, N, A2, Predid, id(Id,Z), id(Id,X), Id). 
-
 
 % Now create the predicate
 pred(id(Id,Bodyctr), Pn ) :- 
@@ -650,7 +776,7 @@ neg(id(Id,Bodyctr)) :-
   protobodylist(Rid, N, Arity, Predid, id(Id,Rlctr), id(Id,Bodyctr), Id), 
   neg(Predid). 
 
-
+% Copy the argument list 
 % zalist(id(Id,Bodyctr),N,id(Id,Bodyctr+N)) :- 
 alist(id(Id,Bodyctr),N,id(Id,Vid)) :- 
   protobodylist(Rid, Bodyid, Arity, Predid, id(Id,Rlctr), id(Id,Bodyctr), Id),
@@ -662,61 +788,60 @@ cnst(id(Id,Bodyctr+N),Val1) :-
   alist(Predid,N,Vid), 
   var(Vid,Vn).
 
+% Handle the compound or typed list tlist/. Out of this we produce 
+% an amount of predicates, which are specified by the first item 
+% of the tlist. We do not tie this to the tlist index or the bodylist index.
+typedbody(id(Id,0), id(Id,Ta,Compoundid) ) :- 
+  protobodylist(Rid, Bodyid, Arity, Predid, id(Id,Rlctr), id(Id,Bodyctr), Id), 
+  compatibletandx(Rid,Compoundid,Id,Ta). 
+
+% Now produce the body 
+body( id(Id,0), id(Id,Ta,Compoundid) ) :- 
+  typedbody(id(Id,0), id(Id,Ta,Compoundid) ).
+
+% Next the predicate 
+pred(id(Id,Ta,Compoundid), Pn, N, Cid) :- 
+  typedbody(id(Id,0), id(Id,Ta,Compoundid) ),
+  tlist(Compoundid,1,Form), 
+  qual(Form, Predid),
+  alist(Predid,N,Cid),
+  pred(Predid,Pn).   % The end of original
 
 
-% Now dig the variables and combine with rassign 
-%alist(id(Id,1),N,id(Id,1+N)) :- 
-%  prnonevaluable(Rid), 
-% not cflctrassign(Rid,Id), 
-% head(Rid,Hid), 
-%  alist(Hid,N,Vid),
-%  var(Vid,Vn),
-%  rassign(Rid,Vn,Val1,Id). 
+neg(id(Id,Ta,Compoundid)) :- 
+  typedbody(id(Id,0), id(Id,Ta,Compoundid) ),
+  tlist(Compoundid,1,Form), 
+  qual(Form, Predid),
+  neg(Predid).
 
-%cnst(id(Id,1+N),Val1) :- 
-%  prnonevaluable(Rid), 
-%  not cflctrassign(Rid,Id), 
-%  rassign(Rid,Vn,Val1,Id),
-%  head(Rid,Hid), 
-%  alist(Hid,N,Vid),
-%  var(Vid,Vn).
+% zneg(
+%  id(
+%   f(2,61,v(1,"1",nil),f(1,63,nil,nil)),
+%   f(2,69,v(2,"1",v(1,"2",nil)),f(1,65,v(2,"1",v(1,"2",nil)),nil)),
+%   63)).
+% 
+% nthintypedlist(63,1,65,v(2,"3",v(1,"3",nil)),nil,f(2,69,v(2,"2",v(1,"1",nil)),f(1,65,v(2,"3",v(1,"3",nil)),nil))).
 
+alist(id(Id,Ta,Compoundid),N,id(Id,Ta,Vid), Vlist, Predid) :- 
+  typedbody(id(Id,0), id(Id,Ta,Compoundid)),
+  nthintypedlist(Compoundid,1,Qid,Vlist,Tmp1,Ta), % Compoundid: 63 
+  % The source platform 
+  tlist(Compoundid,1,Form), 
+  qual(Form, Predid),
+  % pred(Predid,Pn), 
+  alist(Predid,N,Vid).
 
+cnst(id(Id,Ta,Vid), Val) :- 
+  typedbody(id(Id,0), id(Id,Ta,Compoundid)),
+  nthintypedlist(Compoundid,1,Qid,Vlist,Tmp1,Ta), % Compoundid: 63 
+  tlist(Compoundid,1,Form), 
+  qual(Form, Predid),
+  % pred(Predid,Pn), 
+  alist(Predid,N,Vid),
+  nthinapredlst(R2,Pn,N,v(N,Val,Rest),Vlist). 
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% Duplicate of what? XXX
-%duplicate(Rid,Y) :- 
-%  apredlst(Aid,Pn, v(N,Valold,X) ),
-%  zpredlst(Rid, Y, Pn, v(N,Valold,X) ),
-%  bodycount(Rid,N). 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-%diffzassign(X1,X2) :- 
-%  visiblezassign(Rid,Vn,Val1,X1),
-%  visiblezassign(Rid,Vn,Val2,X2),
-%  Val1 != Val2. 
-
-%samezassign(X1,X2) :- 
-%  visiblezassign(Rid,Vn1,Val1,X1), 
-%  visiblezassign(Rid,Vn2,Val2,X2), 
-%  % X1 != X2, 
-% not diffzassign(X1,X2). 
-
-%inconsistentzlist(Rid,X) :- 
-%  zassign(Rid,Predid1,Vn,Val1,X), 
-%  zassign(Rid,Predid2,Vn,Val2,X),
-%  Val1 != Val2. 
-
-%consistentzlist(Rid,X) :- 
-%  not inconsistentzlist(Rid, X), 
-%  bodycount(Rid,Len), 
-%  zlist(Rid,Len,X).
-
-% Next check whether the two lists have the same external values 
 
 % Now we assign the N'th bodypredicate of Rid according to Lid
 % This is just renaming the information in the list for now. 
@@ -767,330 +892,8 @@ groundassign(Jid,N,Val) :-
   alist(Predid,N,Cid), 
   cnst(Cid,Val). 
 
-%timedgroundassign(Jid,@getctr(),N,Val) :- 
-%  assert(Jid),
-%  head(Jid,Predid),
-%  alist(Predid,N,Cid), 
-%  cnst(Cid,Val). 
-
-% ---------------------
-% Start comparing the potential, list based assignments (internal facts) with the 
-% existing ground facts (external facts). 
-
-%% onediffext(Lid,Rid,Jid,N) :- 
-%fulldiffext(Lid,Rid,Jid) :- 
-%  assign(Lid,Rid,N,Val1), 
-%  groundassign(Jid,N,Val2), 
-%  Val1 != Val2, 
-%  % Same predicate name 
-%  head(Rid,Headid), 
-%  head(Jid,JHeadid), 
-%  pred(Headid,Pn), 
-%  pred(JHeadid,Pn). 
-
-%onesameext(Lid,Rid,Jid,N) :- 
-%  assign(Lid,Rid,N,Val1), 
-%  groundassign(Jid,N,Val2), 
-%  Val1 == Val2, 
-%  % Same predicate name 
-%  head(Rid,Headid), 
-%  head(Jid,JHeadid), 
-%  pred(Headid,Pn), 
-%  pred(JHeadid,Pn). 
-
-%fulldiffext(Lid,Rid,Jid) :- 
-%  assign(Lid,Rid,_,_), 
-%  groundassign(Jid,_,_), 
-%  % Different predicate name 
-%  head(Rid,Headid), 
-%  head(Jid,JHeadid), 
-%  pred(Headid,Pn1), 
-%  pred(JHeadid,Pn2),
-%  Pn1 != Pn2. 
-  
-% One differing argument is enough to make it completely different 
-%%fulldiffext(Lid,Rid,Jid) :- 
-%%  onediffext(Lid,Rid,Jid,N).
 
 
-% This does not pertain to predicates with more than one argument
-%fullsameext(Lid,Rid,Jid) :- 
-%  onesameext(Lid,Rid,Jid,N1), 
-%  assert(Jid), 
-%  not fulldiffext(Lid,Rid,Jid).
-
-% For cases with one argument
-%fullsameext(Lid,Rid,Jid) :- 
-%  head(Rid,Hid), 
-%  arity(Hid,1), 
-%  onesameext(Lid,Rid,Jid,N). 
-
-% ---------------------
-% Compare the potential, list based assignments (internal facts) with themselves
-% replicating the structure of the external comparisons. 
-
-% Note that since both refer to same Rid, 
-% we dont have to check the predicate. 
-%% onediffint(Lid1,Rid,Lid2,N) :- 
-%fulldiffint(Lid1,Rid,Lid2) :- 
-%  assign(Lid1,Rid,N,Val1), 
-% assign(Lid2,Rid,N,Val2), 
-%  Lid1 != Lid2, 
-%  Val1 != Val2. 
-
-%onesameint(Lid1,Rid,Lid2,N) :- 
-%  assign(Lid1,Rid,N,Val1), 
-%  assign(Lid2,Rid,N,Val2), 
-%  Lid1 != Lid2, 
-%  Val1 == Val2. 
-
-%%fulldiffint(Lid1,Rid,Lid2) :- 
-%%  onediffint(Lid1,Rid,Lid2,N).
-
-% This does not pertain to predicates with more than one argument
-%fullsameint(Lid1,Rid,Lid2) :- 
-%  onesameint(Lid1,Rid,Lid2,N1), 
-%  % goodassign(Lid1,Rid), % XXX kills all new facts 
-%  Lid1 < Lid2,
-%  not fulldiffint(Lid1,Rid,Lid2).
-
-% Tag the leading argument of a fullsameint cluster 
-% with justified/2 if there is one goodassign in the cluster
-% The first term is the equivalence ID, second is the 
-% justifying predicate. 
-
-% Why would this be needed at all?
-%justified(Lid1,Lid1) :- 
-%  onesameint(Lid1,Rid,Lid2,N1),
-%  goodassign(Lid1,Rid). 
-
-%justified(Lid1,Lid2) :- 
-%  onesameint(Lid1,Rid,Lid2,N1),
-% goodassign(Lid2,Rid). 
-
-
-
-% For cases with one argument
-% This seems to be precisely as the general case...
-% However since there is only one of these, we at the 
-% same time pick the internal one. 
-%2 {
-%  fullsameint(Lid,Rid,Jid), 
-%  pickinternal(Lid,Rid) 
-%} 2 :- 
-%fullsameint(Lid,Rid,Jid) :- 
-%  head(Rid,Hid), 
-%  arity(Hid,1), 
-%  onesameint(Lid,Rid,Jid,N),
-%  Lid < Jid.
-
-% Why is this used?
-% Having this removed doubles the execution time!
-%pickinternal(Lid,Rid) :- 
-%  fullsameint(Lid,Rid,Jid), 
-%  head(Rid,Hid), 
-%  arity(Hid,1), 
-%  onesameint(Lid,Rid,Jid,N),
-%  Lid < Jid.
-
-
-
-
-% Make a closure of fullsameint's 
-% We tag those which are not the 'smallest'
-% XXX Shouldn't this be fullsameint rather than 
-% onesameint?
-%2 {
-%fullsameint(Lid1,Rid,Lid3),
-%subcluster(Lid2,Rid)
-%} 2 :- 
-%subcluster(Lid2,Rid) :- 
-%  fullsameint(Lid1,Rid,Lid2), 
-% fullsameint(Lid2,Rid,Lid3), 
-
-%  Lid1 < Lid3,
-  % goodassign(Lid1,Rid),    % XXX
-%  not fulldiffint(Lid1,Rid,Lid3),
-%  not fullsameint(Lid3,Rid,Lid1).
-%  %not fullsameint(Lid3,Rid,Tmp),
-  %nxt(Tmp).
-
-%fullsameint(Lid1,Rid,Lid3) :- 
-%  subcluster(Lid2,Rid), 
-%  fullsameint(Lid1,Rid,Lid2), 
-%  fullsameint(Lid2,Rid,Lid3), 
-%  Lid1 < Lid3,
-%  not fulldiffint(Lid1,Rid,Lid3),
-%  not fullsameint(Lid3,Rid,Lid1).
-
-
-
-% We assume that the closure has been constructed. 
-% We have one 'main' cluster, which has more than one
-% Lid1s. It could only have been constructed transitively 
-% so it is identified as the source of the closure.
-% The first term of fullsameint/3 is the key or identity of
-% the cluster and all but the 'main' cluster have been 
-% tagged with subcluster/2 by comparison. 
-
-%pickinternal(Lid1,Rid) :- 
-%  fullsameint(Lid1,Rid,Lid2),     % The 'main' cluster, identified by Lid1
-%  not subcluster(Lid1,Rid),
-%  % justified(Lid1,Lid),            % There must be a justified/2 tagged entry associated with Lid1
-%  fullsameint(Lid2,Rid,Lid3).
-
-%pickexternal(Lid1,Rid) :- 
-%  fullsameint(Lid1,Rid,Lid2),
-%  not deny(Lid1,Rid).
-
-%goodorder(Lid,Rid,Aid) :- 
-%    assert(Aid), 
-%    fullsameext(Lid,Rid,Aid),
-%    Aid > Lid. 
-
-%deny(Lid,Rid) :- 
-%    assert(Jid),
-%    fullsameext(Lid,Rid,Jid),
-%    not goodorder(Lid,Rid,Jid). 
-
-%visibleassign(Lid,Rid,Vn,Val) :- 
-%  mkassign(Lid,Rid,Predid,Mapid,Jid,N), 
-%  headvarval(Rid,Pn,N,Vn,Bidx,Bpredidx), 
-%  alist(Jid,Bpredidx,Cid), 
-%  cnst(Cid,Val).
-
-% Sameassign
-% samealids(Lid1,Rid,Lid2,N) :- 
-%samealids(Lid1,Rid,Vn,Lid2) :- 
-  % Get the index of the argument number 
-  % for the new candidate:
-  % predicate Pn has value Val1 at position N.
-  % tstassign(Lid,Rid,Vn,Val1),   
-%  visibleassign(Lid1,Rid,Vn,Val1),   
-%  visibleassign(Lid2,Rid,Vn,Val2),
-%  Lid1 != Lid2,
-%  Val1 = Val2. 
-
-%diffalids(Lid1,Rid,Vn,Lid2) :- 
-  % Get the index of the argument number 
-  % for the new candidate:
-  % predicate Pn has value Val1 at position N.
-  % tstassign(Lid,Rid,Vn,Val1),   
-%  visibleassign(Lid1,Rid,Vn,Val1),   
-%  visibleassign(Lid2,Rid,Vn,Val2),
-%  Lid1 != Lid2,
-%  Val1 != Val2. 
-
-% projectdiffalid(Lid1,Rid,Lid2) :- diffalids(Lid1,Rid,Vn,Lid2).
-
-
-% Is there an assignment to position N 
-% of Rid in ground predicate Aid. 
-%sameassign(Lid,Rid,Aid,N) :- 
-  % Get the index of the argument number 
-  % for the new candidate:
-  % predicate Pn has value Val1 at position N.
-  % tstassign(Lid,Rid,Vn,Val1),   
-%  visibleassign(Lid,Rid,Vn,Val1),   
-%  head(Rid,Hid1), 
-%  alist(Hid1,N,Vid1), 
-%  var(Vid1,Vn), 
-%  arity(Hid1,A1), 
-%  pred(Hid1,Pn), 
-  % Now compare to existing facts 
-%  assert(Aid), 
-%  head(Aid,Hid2), 
-  % Same predicate name with same Value at the same place
-%  pred(Hid2,Pn), 
-%  alist(Hid2,N,Cid1),
-%  cnst(Cid1,Val1). 
-
-% Negation of sameassign/4
-% Meaning that at least one argument is different, so at least 
-% one argument of Aid is incomaptible with Lid. 
-%diffassign(Lid,Rid,Aid,N) :- 
-  % Get the index of the argument number 
-  % for the new candidate:
-  % predicate Pn has value Val1 at position N.
-  % tstassign(Lid,Rid,Vn,Val1),   
-%  visibleassign(Lid,Rid,Vn,Val1),   
-%  head(Rid,Hid1), 
-%  alist(Hid1,N,Vid1), 
-%  var(Vid1,Vn), 
-%  arity(Hid1,A1), 
-%  pred(Hid1,Pn), 
-%  % Now compare to existing facts 
-%  assert(Aid), 
-%  head(Aid,Hid2), 
-  % Same predicate name with different Value at the same place
-%  pred(Hid2,Pn), 
-%  alist(Hid2,N,Cid1),
-%  cnst(Cid1,Val2),
-%  Val1 != Val2. 
-
-% This enumerates those ground predicates 
-% which may be pertinent for this List of assignments. 
-%feasibleground(Lid,Rid,Aid) :- 
-%  visibleassign(Lid,Rid,Vn,Val), 
-%  head(Rid,Predid),
-%  pred(Predid,Pn), 
-%  % There is an assertion with same predicatename
-%  assert(Aid),
-%  head(Aid,Justid),
-%  pred(Justid,Pn).
-
-
-% Something is really same, if there are no diffassign/4 
-% associated with it, but there is a sameassign. 
-%reallysame(Lid,Rid,Aid) :- 
-%  sameassign(Lid,Rid,Aid,N1), 
-%  head(Aid,Predid),
-%  alist(Predid,N2,Cid), 
-%  not diffassign(Lid,Rid,Aid,N2), 
-%  % And the assertion has not been produced by this lid
-%  not assigned(Lid,Aid).
-
-% projectreallysame(Lid,Rid) :- reallysame(Lid,Rid,Aid).
-
-
-%reallydiff(Lid,Rid,Aid) :- 
-%  projectdiff(Lid,Rid,Aid),
-%  not projectreallysame(Lid,Rid). 
-
-
-%projectsame(Lid,Rid,Aid) :- sameassign(Lid,Rid,Aid,N). 
-
-% If there is a single projectdiff, then they are different 
-%projectdiff(Lid,Rid,Aid) :- diffassign(Lid,Rid,Aid,N). 
-
-% All arguments are same and there is no single 
-% differing argument. So Lid and Aid are the same. 
-%samelistground(Rid,Lid,Aid) :- 
-%  projectsame(Lid,Rid,Aid), 
-%  not projectdiff(Lid,Rid,Aid).
-  
-% projectsameground(Rid,Lid) :- samelistground(Rid,Lid,Aid). 
-
-
-% Do we have two assignments with different values to the same variable name 
-%badassign(Lid,Rid) :- 
-%  tstassign(Lid,Rid,Vn,Val1),   
-%  tstassign(Lid,Rid,Vn,Val2), 
-%  Val1 != Val2. 
-
-%iststassigned(Lid,Rid,Vn) :-   tstassign(Lid,Rid,Vn,Val1). 
-
-%badassign(Lid,Rid) :- 
-%  potential(Rid,Lid), 
-%  headvarval(Rid,Pn,N,Vn,X1,X2),
-%  not iststassigned(Lid,Rid,Vn).
-
-% What case does this cover? If this is not here no multiple arguments
-%goodassign(Lid,Rid) :- 
-%  % tstassign 		   
-%  % not prassigned(Lid), 
-%  visibleassign(Lid,Rid,Vn,Val), 
-%  not badassign(Lid,Rid). 
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1130,80 +933,6 @@ arity(id(Id,1),A) :-
 assert(id(Id,0)) :- 
   groundrule(Pn,Id). 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% The integer based solutions 
-% are below
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%hasrule(1,NF) :- 
-%  newpotfact(NF, Rid, Pn, X). 
-
-
-%pos(NF+1) :- 
-%  newpotfact(NF, Rid, Pn, X). 
-
-%newname(NF,"JOPI") :- 
-%  newpotfact(NF, Rid, Pn, X). 
-
-%head(NF,NF+1) :- 
-%  newpotfact(NF, Rid, Pn, X). 
-
-%pred(NF + 1, Pn ) :- 
-%  newpotfact(NF, Rid, Pn, X). 
-
-%assigned(NF) :- 
-%  newpotfact(NF, Rid, Pn, X). 
-
-%assert(NF) :- 
-%  newpotfact(NF, Rid, Pn, X). 
-
-%pickedandgood(Lid,Rid) :- 
-%  goodassign(Lid,Rid),
-%  pickinternal(Lid,Rid).
-
-%% prassigned(Lid) :- assigned(Lid,New). 
-
-% fsame(Lid,Rid) :- fullsameext(Lid,Rid,New). 
-
-% Once we have assigned one 
-% we tag all Lists with same values 
-% as assigned as well. 
-%assigned(Lid2,New) :- 
-%  assigned(Lid,New),
-%  fullsameint(Lid,Rid,Lid2). 
-
-% Get the external ones. 
-%assigned(Lid2,New) :- 
-%  assigned(Lid1,New),
-%  fullsameext(Lid1,Rid,New), 
-%  fullsameext(Lid2,Rid,New).
-
-%lsttmp(NF,N,Val,A, Rid) :- 
-%  newpotfact(NF, Rid, Pn, X),
-%  head(Rid,Hid), 
-%  arity(Hid,A), 
-%  visiblezassign(Rid,Vn,Val,X), 
-%  alist(Hid,N,Vid), 
-%  var(Vid,Vn). 
-
-%alist(NF+1,N,NF+1+N) :- 
-%  lsttmp(NF,N,Val,A,Rid).
-
-%cnst(NF+1+N,Val) :- 
-%  lsttmp(NF,N,Val,A, Rid).
-
-%arity(NF+1,A) :- 
-%  lsttmp(NF,N,Val,A, Rid).
-
-%assert(NF) :- 
-%  lsttmp(NF,N,Val,A, Rid).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Trial here generated rule-specific rules which 
-% tie together the skeleton of the reified rules. 
-% This is a bit of a cop out, though, we generate 
-% another version of the same rule. 
-%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %
 % The variable 'Vn' in the head
@@ -1250,54 +979,23 @@ bodyvarpos(Rid,Vn,Bidx,Idx) :-
   alist(Predid,Idx,Vid), 
   var(Vid,Vn). 
 
-%mapsagreeonvar(Rid,Predid1,Jid1,Predid2,Jid2,Vn,Val1) :- 
-%  onerulemap(Rid, Bidx1, Predid1, Jid1, One1),
-% onerulemap(Rid, Bidx2, Predid2, Jid2, One2),
-%  Predid1 != Predid2, 
-  % 
-%  headvarval(Rid,Pn,Idx,Vn,Bidx1,Bpredidx1), 
-%  headvarval(Rid,Pn,Idx,Vn,Bidx2,Bpredidx2), 
-%  alist(Jid1,Bpredidx1,Vid1), 
-%  cnst(Vid1,Val1), 
-%  alist(Jid2,Bpredidx2,Vid2), 
-%  cnst(Vid2,Val2), 
-%  Val1 == Val2.
-
-%consistentassignments(Rid,Bidx1,Jid1,Bidx2,Jid2) :- 
-%  bodyvarpos(Rid,Vn,Bidx1,Pos1),
-%  bodyvarpos(Rid,Vn,Bidx2,Pos2),
-%  Bidx1 != Bidx2,
-%%  % Now any two mappings must match for values on Bidx1/Pos1 Bidx2/Pos2
-  % Here we get two mappings for these Bidx's 
-%  onerulemap(Rid, Bidx1, Predid1, Jid1, One1),
-%  onerulemap(Rid, Bidx2, Predid2, Jid2, One2),
-  % Now we need to get the corresponding positions from the ground fact 
-%  alist(Jid1,Pos1,Vid1),
-%  cnst(Vid1,Val1), 
-% alist(Jid2,Pos2,Vid2),
-%  cnst(Vid2,Val2),
-%  Val1 == Val2. 
-
-% Agree on variables in the head
-% Target: chunga(Rid,Vn,Val1,Predid1,Jid1,Val2,Predid2,Jid2) :- 
-% XXX not used yet 
-%headconsistentvariable(Rid,Vn,Val1,Jid1,Predid1,Val2,Predid2,Jid2) :- 
-%  onerulemap(Rid, Bidx1, Predid1, Jid1, One1),
-%  onerulemap(Rid, Bidx2, Predid2, Jid2, One2),
-%  Predid1 != Predid2, 
-%  % Agree on all variables in the head
- % headvarval(Rid,Pn,Idx1,Vn,Bidx1,Bpredidx1), 
-  % headvarval(Rid,Pn,Idx2,Vn,Bidx2,Bpredidx2),    % XXXX This may be bad news 
-%  alist(Jid1,Bpredidx1,Vid1),
-%  cnst(Vid1,Val1), 
-%  alist(Jid2,Bpredidx2,Vid2),
-%  cnst(Vid2,Val2),
-%  Val1 == Val2.
-
 % A rule has a body which is negated
 nonevaluable(Rid,Bid) :- 
   body(Rid,Bid), 
   neg(Bid). 
+
+% The negated body may also be inside the typed list 
+nonevaluable(Rid,Bid) :- 
+  body(Rid,Bid), 
+  composite(Bid), 
+  tlist(Bid,1,Qid),
+  qual(Qid,Predid), 
+  neg(Predid). 
+
+% Constraint is always noneval
+nonevaluable(Rid,Bid) :- 
+  body(Rid,Bid), 
+  constraint(Rid). 
 
 % A rule refers to a nonevaluable rule 
 nonevaluable(Rid1,Bid1) :- 
