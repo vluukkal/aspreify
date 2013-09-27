@@ -79,7 +79,8 @@ data IntermediateR = IntermediateR {
      -- 
      bexprh      :: (M.Map String [String]), 
      constsh     :: (M.Map String [String]),
-     emptyh      :: (M.Map String [String])
+     emptyh      :: (M.Map String [String]),
+     groundh      :: (M.Map String Bool)
 } deriving (Show)
 
 emptyIntermediate x = 
@@ -91,7 +92,7 @@ emptyIntermediate x =
        largh = M.empty, rargh = M.empty, boph = M.empty,tlisth = M.empty, 
        quals = M.empty, composedh = M.empty, mkassigns = M.empty, rassigns = M.empty, 
        ptrue = M.empty, pfalse = M.empty, newfact = M.empty, truerule = M.empty, 
-       xpand = M.empty, bexprh = M.empty, constsh = M.empty, emptyh = M.empty}
+       xpand = M.empty, bexprh = M.empty, constsh = M.empty, emptyh = M.empty, groundh = M.empty}
 
 collectb :: t -> t1 -> Body
 collectb rls bdy = Empty 
@@ -139,6 +140,8 @@ assigntohash hs nm bdy neg =
       "composite" ->  addtype bdy nm 0
       "constraint" -> addtype bdy nm 0
       "assert" -> addtype bdy nm 0
+      "ground" -> let newhs = M.insert (getarg bdy 0) True (groundh hs) in
+                       hs { groundh = newhs }
       "head" -> let src = getarg bdy 0 in 
                 let trgt = getarg bdy 1 in 
                 let tmphs = headsh hs in 
@@ -372,11 +375,25 @@ crulebase handleall hash key v accu =
     (L.foldr (citem handleall hash) [] v)
     -- (RComment ("crulebase handling: " ++ show(key) ++ " : " ++ show(v) )):(L.foldr (citem handleall hash) [] v)
 
+isruleground h k = 
+  let groundbit = M.lookup k (groundh h) in 
+  case groundbit of 
+       Just x -> True 
+       -- Nothing -> False 
+       Nothing -> (iskeyassert h k)
+
+iskeyassert h k = 
+  let isassert = M.lookup k (typeh h) in 
+  case isassert of 
+       Just "assert" -> True
+       Just foo -> False
+       Nothing -> False
 
 getrulevars h k = 
    let vars = M.lookup k (mkassigns h) in 
    case vars of 
-        Just r -> if (doground h) then  (h { rassigns = r }) else h
+        Just r -> -- if (doground h) then  (h { rassigns = r }) else h
+             h
         Nothing -> h 
 
 {--
@@ -403,24 +420,27 @@ citem hash key accu =
 
 citem :: Bool -> IntermediateR -> String -> [Rules] -> [Rules]
 citem handleall hash key accu = 
+   -- Check whether we are grounding and whether this rule has been 
+   -- tagged with ground/1. 
    let hash' = getrulevars hash key in 
-   -- Ugh, cake on cake here
-   -- let hash' = if (doground hash') then hash' else (hash' { rassigns = M.empty }) in 
-   let tp = M.lookup key (typeh hash') in 
-   let cmnt = (RComment ("Source key: " ++ show(key) )) in
-   case tp of 
-      Just "rule" -> checkground key hash' (crule hash' key (cmnt:accu)) accu 
-      Just "constraint" -> checkground key hash' (cconstraint hash' key (cmnt:accu)) accu 
-      Just "assert" -> if handleall then (cassert hash' key (cmnt:accu)) else 
+   -- if not (doground hash') && not (isruleground hash' key) then accu
+   if False then accu
+   else
+      let tp = M.lookup key (typeh hash') in 
+      let cmnt = (RComment ("Source key: " ++ show(key) ++ " - ground:" ++ show((isruleground hash' key)) ++ " - doground: " ++ show(doground hash') )) in
+      case tp of 
+         Just "rule" -> checkground key hash' (crule hash' key (cmnt:accu)) accu 
+         Just "constraint" -> checkground key hash' (cconstraint hash' key (cmnt:accu)) accu 
+         Just "assert" -> if handleall then (cassert hash' key (cmnt:accu)) else 
                           -- Check here if this is newly generated one. 
                           if (M.member key (newfact hash') ) then (cassert hash' key (cmnt:accu)) else accu 
-      -- Just "composite" -> cassert hash key accu 
-      Just x -> (Deny [Plain (Const ("Error at citem: unknown item: "++ x ++ " for key " ++ show(key) )) [] True]):accu 
-      Nothing -> -- accu 
-              (Deny [Plain (Const ("Error at citem: unknown ID: "++key )) [] True]):accu 
+         -- Just "composite" -> cassert hash key accu 
+         Just x -> (Deny [Plain (Const ("Error at citem: unknown item: "++ x ++ " for key " ++ show(key) )) [] True]):accu 
+         Nothing -> -- accu 
+                   (Deny [Plain (Const ("Error at citem: unknown ID: "++key )) [] True]):accu 
    where 
       checkground id h func accu = 
-        if (nullorbogus h) && (doground h) && (not (M.member id (newfact h) ))
+        if (nullorbogus h) && (doground h) && not (isruleground h id)  -- (not (M.member id (newfact h) ))
         -- then (RComment ("Not grounding: " ++ show(key) ++ " -- " ++ (show h))):accu 
         -- then (RComment ("Not grounding: " ++ show(key) ++ " -- " ++ show(doground h))):accu 
         then accu 
