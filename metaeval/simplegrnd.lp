@@ -667,6 +667,11 @@ constraint(id(Id,0)) :-
   not cflctrassign(Rid,Id), 
   rassign(Rid,Vn,Val1,Id).      % This is needed to access the ID 
   
+ground(id(Id,0)) :- 
+  prnonevaluable(Rid), 
+  not cflctrassign(Rid,Id), 
+  rassign(Rid,Vn,Val1,Id). 
+
 newname(id(Id,0),"HUU",Rid) :- 
   prnonevaluable(Rid), 
   not cflctrassign(Rid,Id), 
@@ -907,6 +912,9 @@ hasrule(1,id(Id,0)) :-
 pos(id(Id,1)) :- 
   groundrule(Pn,Id). 
 
+ground(id(Id,0)) :- 
+  groundrule(Pn,Id). 
+
 newname(id(Id,0),"JOPI") :- 
   groundrule(Pn,Id). 
 
@@ -1012,9 +1020,10 @@ evaluable(Rid) :-
   body(Rid,Bid), 
   not prnonevaluable(Rid). 
 
-% #hide. 
+#hide. 
 
 #show rule/1. 
+#show ground/1. 
 #show hasrule/2.
 #show head/2.
 #show pred/2. 
@@ -1030,3 +1039,5 @@ evaluable(Rid) :-
 #show bop/2.
 #show larg/2.
 #show rarg/2.
+#show constraint/1. 
+
