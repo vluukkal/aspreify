@@ -251,21 +251,21 @@ tconflict(Rid,Vn, Val1, Predid1, Val2, Predid2, X1, X2) :-
 % project it away. 
 % Actually we may not need to do that, but we may need 
 % to check that the lists used are compatible. 
-vlist(Rid,Pn,v(1, Val, nil), X ) :- 
-  visiblexassign(Rid,Vn,Val,X),
-  % We need the variables bound by Predid. 
-  bodyvarpospre(Rid,Vn,Predid,Pos), 
-  Pos == 1, 
-  head(Rid,Hid),
-  pred(Hid,Pn).
+%vlist(Rid,Pn,v(1, Val, nil), X ) :- 
+%  visiblexassign(Rid,Vn,Val,X),
+%  % We need the variables bound by Predid. 
+%  bodyvarpospre(Rid,Vn,Predid,Pos), 
+%  Pos == 1, 
+%  head(Rid,Hid),
+%  pred(Hid,Pn).
 
 % Build iteratively 
-vlist(Rid,Pn,v(N+1, Valnew, v(N, Val, Rest) ), X) :- 
-  vlist(Rid,Pn,v(N, Val, Rest), X ), 
-  visiblexassign(Rid,Vn,Valnew,X),
-  bodyvarpospre(Rid,Vn,Predid,N+1), 
-  head(Rid,Hid),
-  pred(Hid,Pn).
+%vlist(Rid,Pn,v(N+1, Valnew, v(N, Val, Rest) ), X) :- 
+%  vlist(Rid,Pn,v(N, Val, Rest), X ), 
+%  visiblexassign(Rid,Vn,Valnew,X),
+%  bodyvarpospre(Rid,Vn,Predid,N+1), 
+%  head(Rid,Hid),
+%  pred(Hid,Pn).
 
 % We combine 'visibleassign/' which relates a variable name (occurring in the head)
 % to a value with other visibleassign/
@@ -805,7 +805,8 @@ body( id(Id,0), id(Id,Ta,Compoundid) ) :-
   typedbody(id(Id,0), id(Id,Ta,Compoundid) ).
 
 % Next the predicate 
-pred(id(Id,Ta,Compoundid), Pn, N, Cid) :- 
+% pred(id(Id,Ta,Compoundid), Pn, N, Cid) :- 
+pred(id(Id,Ta,Compoundid), Pn) :- 
   typedbody(id(Id,0), id(Id,Ta,Compoundid) ),
   tlist(Compoundid,1,Form), 
   qual(Form, Predid),
@@ -827,7 +828,8 @@ neg(id(Id,Ta,Compoundid)) :-
 % 
 % nthintypedlist(63,1,65,v(2,"3",v(1,"3",nil)),nil,f(2,69,v(2,"2",v(1,"1",nil)),f(1,65,v(2,"3",v(1,"3",nil)),nil))).
 
-alist(id(Id,Ta,Compoundid),N,id(Id,Ta,Vid), Vlist, Predid) :- 
+% alist(id(Id,Ta,Compoundid),N,id(Id,Ta,Vid), Vlist, Predid) :- 
+alist(id(Id,Ta,Compoundid),N,id(Id,Ta,Vid)) :- 
   typedbody(id(Id,0), id(Id,Ta,Compoundid)),
   nthintypedlist(Compoundid,1,Qid,Vlist,Tmp1,Ta), % Compoundid: 63 
   % The source platform 
