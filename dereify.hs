@@ -73,6 +73,7 @@ data IntermediateR = IntermediateR {
      truerule  :: (M.Map String String),
      pfalse     :: (M.Map String String),
      newfact     :: (M.Map String String),
+     provenancesh :: (M.Map String [String]),
      -- xpand     :: (M.Map (String,String) (M.Map String String)),
      -- xpand     :: (M.Map String [(M.Map String String)]),
      xpand     :: (M.Map String (M.Map String (M.Map String String))),
@@ -91,7 +92,7 @@ emptyIntermediate x =
        predsh = M.empty, varsh = M.empty, alisth = M.empty, typeh = M.empty, 
        largh = M.empty, rargh = M.empty, boph = M.empty,tlisth = M.empty, 
        quals = M.empty, composedh = M.empty, mkassigns = M.empty, rassigns = M.empty, 
-       ptrue = M.empty, pfalse = M.empty, newfact = M.empty, truerule = M.empty, 
+       ptrue = M.empty, pfalse = M.empty, newfact = M.empty, truerule = M.empty, provenancesh = M.empty, 
        xpand = M.empty, bexprh = M.empty, constsh = M.empty, emptyh = M.empty, groundh = M.empty}
 
 collectb :: t -> t1 -> Body
@@ -323,6 +324,17 @@ assigntohash hs nm bdy neg =
                   -- let newhs = M.insertWith (++) src [(idx,trgt)] tmphs in
                   let newhs = M.insertWith updlst src [(idx,trgt)] tmphs in
                        hs { tlisth = newhs }
+      "provenance" -> let src = getarg bdy 0 in 
+                let pn = getarg bdy 2 in 
+                let vn = getarg bdy 3 in 
+                let val = getarg bdy 4 in 
+                let prov = getarg bdy 5 in 
+                let tmphs = provenancesh hs in 
+                -- Now create a string for this 
+                let provstr = pn ++ "/" ++ vn ++ " = " ++ val ++ " (" ++ prov ++ ")" in 
+                let newhs = M.insertWith updlst src [provstr] tmphs in
+                -- let newhs = M.insert src [trgt] tmphs in -- This could be trget instead of [trgt]
+                       hs { provenancesh = newhs }
       otherwise -> let tmphs = emptyh hs in 
                    let newhs = M.insert nm [""] tmphs in
                        hs { emptyh = newhs }
@@ -427,13 +439,18 @@ citem handleall hash key accu =
    if False then accu
    else
       let tp = M.lookup key (typeh hash') in 
-      let cmnt = (RComment ("Source key: " ++ show(key) ++ " - ground:" ++ show((isruleground hash' key)) ++ " - doground: " ++ show(doground hash') )) in
+      let cmnt = (RComment ("Source key: " ++ show(key) )) in
+      let provenances = M.lookup key (provenancesh hash') in 
+      let provlst = case provenances of 
+                         Just p -> L.map (\i -> (RComment i) ) p
+                         Nothing -> [] 
+      in 
       case tp of 
-         Just "rule" -> checkground key hash' (crule hash' key (cmnt:accu)) accu 
-         Just "constraint" -> checkground key hash' (cconstraint hash' key (cmnt:accu)) accu 
-         Just "assert" -> if handleall then (cassert hash' key (cmnt:accu)) else 
+         Just "rule" -> checkground key hash' (crule hash' key ((cmnt:provlst)++accu)) accu 
+         Just "constraint" -> checkground key hash' (cconstraint hash' key ((cmnt:provlst)++accu)) accu 
+         Just "assert" -> if handleall then (cassert hash' key ((cmnt:provlst)++accu)) else 
                           -- Check here if this is newly generated one. 
-                          if (M.member key (newfact hash') ) then (cassert hash' key (cmnt:accu)) else accu 
+                          if (M.member key (newfact hash') ) then (cassert hash' key ((cmnt:provlst)++accu)) else accu 
          -- Just "composite" -> cassert hash key accu 
          Just x -> (Deny [Plain (Const ("Error at citem: unknown item: "++ x ++ " for key " ++ show(key) )) [] True]):accu 
          Nothing -> -- accu 
