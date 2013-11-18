@@ -285,6 +285,7 @@ tconflict(Rid,Vn, Val1, Predid1, Val2, Predid2, X1, X2) :-
 % 
 % vlist2(8,"reach",z(1,"X","2",15,v(2,"1",v(1,"2",nil)),nil)).
 %
+
 vlist2(Rid,Pn,z(1, Vn, Val, Predid, X, nil) ) :- 
   visiblexassign(Rid,Vn,Val,X),
   % We need the variables bound by Predid. 
@@ -1022,7 +1023,7 @@ evaluable(Rid) :-
   body(Rid,Bid), 
   not prnonevaluable(Rid). 
 
-#hide. 
+% #hide. 
 
 #show rule/1. 
 #show ground/1. 
