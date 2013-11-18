@@ -148,35 +148,15 @@ and metaeval/meta.lp contains a metaevaluator for variable-free answer set progr
 A quick test of metagrounding:
 0. cd metaeval/
 1. Reify the data and the payload rules: 
-   ../aspreify 
+   ../aspreify hamilton_toground.lp 
+2. Run the grounding:
+   ./provground.sh hamilton_toground.lp.reified 
+   which will produce a directory 'hamilton_toground$date_$time'
+3. The result is available in: 
+   hamilton_toground$date_$time/output/smres1.lp.ground
    
-
-metaeval/hamilton.lp contains an answer set program with variables 
-and metaeval/metaground_3.lp contains a metagrounder implementation. 
-Note that the script ground.sh performs the steps below. 
-
-0. Combine the rules with data: 
-   cat metaeval/hamilton_data1.lp metaeval/hamilton.lp > metaeval/a.lp
-   (note, that we could also use just the rules in hamilton.lp, but 
-   grounding would not produce any results).
-1. Reify the program: ./aspreify metaeval/a.lp
-   to produce metaeval/a.lp.reified 
-2. Combine the metagrounder with the reified program: 
-   cat metaeval/metaground.lp metaeval/a.lp.reified > metaeval/b.lp
-3. Calculate the variable assignments: gringo metaeval/b.lp | clasp -n 0 
-   with 63 answer sets, mkassign/3 contains the variable assignments.
-   Each answer set pertains to variable assignment to a single rule. 
-4. Produce the ground program, postprocess the answer sets
-   gringo metaeval/b.lp | clasp -n 0 | python smodelsres.py 
-   will produce the answer sets to separate files named smres1.lp, 
-   smres2.lp, ..., smres63.lp
-   Each answer set pertains to a particular variable assignment for 
-   a particular rule and nothing else. 
-5. Produce ground rules: ./aspreify -g metaeval/smres*.lp will produce files 
-   smres1.lp.ground, smres2.lp.ground,... which can then be catenated
-   to one file which corresponds to the ground program and can be handled 
-   by clasp, smodels or similar. 
-   cat *.lp.ground > res.lp
+Note that you may need to set the paths in provground.sh to fit your 
+system and installation. 
 
 5. Other
 
