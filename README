@@ -39,6 +39,12 @@ Requires Haskell platform (http://www.haskell.org/platform/), tested on 2012.2.0
 To produce an executable:
 > ghc -O2 -o aspreify main.hs rdfrender.hs txtrender.hs factrender.hs aspparse.hs dereify.hs
 
+Alternatively, to enable RTS options 
+> ghc -rtsopts -O2 -o aspreify main.hs rdfrender.hs txtrender.hs factrender.hs aspparse.hs dereify.hs
+
+And run with e.g. increased stack size:
+> ./aspreify +RTS -K128M -RTS -d tests/hamiltonian_cycle.lp.reified
+
 Obtain the sources initially:
 > git clone git://www.github.com/vluukkal/aspreify
 
@@ -72,14 +78,8 @@ tests/hamiltonian_cycle.lp.reified.dereified
 The result is corresponding set of dereified and ground rules 
 produced to 
 tests/hamiltonian_cycle.lp.reified.ground
-The actual grounding must have been done beforehand; the input 
-file must contain facts which describe the grounding. 
+Only ground rules are produced, other rules (with variables) are ignored. 
 
-Alternatively, to enable RTS options 
-> ghc -rtsopts -O2 -o aspreify main.hs rdfrender.hs txtrender.hs factrender.hs aspparse.hs dereify.hs
-
-And run with e.g. increased stack size:
-> ./aspreify +RTS -K128M -RTS -d tests/hamiltonian_cycle.lp.reified
 
 2. Limitations 
 
@@ -108,7 +108,7 @@ e.g. minimize { a(X), b(Y) } will be accepted.
 The dereifier and grounder do not yet support the following syntactical 
 constructs:
 - weighted statments
-- choice staments
+- choice statements
 - full expressions 
 - maximize, minimize, compute, function, external, show, hide 
 - #show, #hide
