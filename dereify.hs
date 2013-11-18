@@ -74,6 +74,8 @@ data IntermediateR = IntermediateR {
      pfalse     :: (M.Map String String),
      newfact     :: (M.Map String String),
      provenancesh :: (M.Map String [String]),
+     idtoprovh :: (M.Map String (M.Map String String)), -- Like mkassigns 
+     subprovenancesh :: (M.Map String [String]),
      -- xpand     :: (M.Map (String,String) (M.Map String String)),
      -- xpand     :: (M.Map String [(M.Map String String)]),
      xpand     :: (M.Map String (M.Map String (M.Map String String))),
@@ -92,8 +94,8 @@ emptyIntermediate x =
        predsh = M.empty, varsh = M.empty, alisth = M.empty, typeh = M.empty, 
        largh = M.empty, rargh = M.empty, boph = M.empty,tlisth = M.empty, 
        quals = M.empty, composedh = M.empty, mkassigns = M.empty, rassigns = M.empty, 
-       ptrue = M.empty, pfalse = M.empty, newfact = M.empty, truerule = M.empty, provenancesh = M.empty, 
-       xpand = M.empty, bexprh = M.empty, constsh = M.empty, emptyh = M.empty, groundh = M.empty}
+       ptrue = M.empty, pfalse = M.empty, newfact = M.empty, truerule = M.empty, provenancesh = M.empty, subprovenancesh = M.empty, 
+       idtoprovh = M.empty, xpand = M.empty, bexprh = M.empty, constsh = M.empty, emptyh = M.empty, groundh = M.empty}
 
 collectb :: t -> t1 -> Body
 collectb rls bdy = Empty 
@@ -331,10 +333,31 @@ assigntohash hs nm bdy neg =
                 let prov = getarg bdy 5 in 
                 let tmphs = provenancesh hs in 
                 -- Now create a string for this 
-                let provstr = pn ++ "/" ++ vn ++ " = " ++ val ++ " (" ++ prov ++ ")" in 
+                -- let provstr = pn ++ "/" ++ vn ++ " = " ++ val ++ " (" ++ prov ++ ")" in 
+                let provstr = vn ++ " = " ++ val ++ " (" ++ prov ++ ")" in 
                 let newhs = M.insertWith updlst src [provstr] tmphs in
                 -- let newhs = M.insert src [trgt] tmphs in -- This could be trget instead of [trgt]
                        hs { provenancesh = newhs }
+      "subprovenance" -> let src = getarg bdy 0 in 
+                let rid = getarg bdy 1 in 
+                let prov = getarg bdy 2 in 
+                let tmphs = subprovenancesh hs in 
+                -- Now create a string for this 
+                -- let provstr = pn ++ "/" ++ vn ++ " = " ++ val ++ " (" ++ prov ++ ")" in 
+                let provstr = rid ++ " : " ++ prov in 
+                let newhs = M.insertWith updlst src [provstr] tmphs in
+                -- let newhs = M.insert src [trgt] tmphs in -- This could be trget instead of [trgt]
+                       hs { subprovenancesh = newhs }
+      "idtoprov" ->  let id = getarg bdy 0 in 
+                  let provid = getarg bdy 1 in 
+                  let pn = getarg bdy 2 in 
+                  let tmphs = idtoprovh hs in 
+                  let tmpins = M.insert pn provid M.empty in 
+                  let newhs = M.insertWith updvr id tmpins tmphs in 
+                       hs { idtoprovh = newhs }
+                  where 
+                      updvr :: Ord k => M.Map k a -> M.Map k a -> M.Map k a
+                      updvr newh oldh = M.union oldh newh
       otherwise -> let tmphs = emptyh hs in 
                    let newhs = M.insert nm [""] tmphs in
                        hs { emptyh = newhs }
@@ -440,17 +463,23 @@ citem handleall hash key accu =
    else
       let tp = M.lookup key (typeh hash') in 
       let cmnt = (RComment ("Source key: " ++ show(key) )) in
-      let provenances = M.lookup key (provenancesh hash') in 
-      let provlst = case provenances of 
+      -- let provenances = M.lookup key (provenancesh hash') in 
+      let subprovenances = M.lookup key (subprovenancesh hash') in 
+      let idprovs = M.lookup key (idtoprovh hash) in 
+      let provlst = case subprovenances of 
                          Just p -> L.map (\i -> (RComment i) ) p
                          Nothing -> [] 
       in 
+      let idprovlst = case idprovs of 
+                         Just p -> L.map (\(key,val) -> (RComment (key ++ ":" ++ val )) ) (M.toList(p))
+                         Nothing -> [(RComment "no idprovs")]
+      in 
       case tp of 
-         Just "rule" -> checkground key hash' (crule hash' key ((cmnt:provlst)++accu)) accu 
-         Just "constraint" -> checkground key hash' (cconstraint hash' key ((cmnt:provlst)++accu)) accu 
-         Just "assert" -> if handleall then (cassert hash' key ((cmnt:provlst)++accu)) else 
+         Just "rule" -> checkground key hash' (crule hash' key ((provlst++idprovlst++[cmnt])++accu)) accu 
+         Just "constraint" -> checkground key hash' (cconstraint hash' key ((provlst++idprovlst++[cmnt])++accu)) accu 
+         Just "assert" -> if handleall then (cassert hash' key (provlst++idprovlst++[cmnt]++accu)) else 
                           -- Check here if this is newly generated one. 
-                          if (M.member key (newfact hash') ) then (cassert hash' key ((cmnt:provlst)++accu)) else accu 
+                          if (M.member key (newfact hash') ) then (cassert hash' key ((provlst++idprovlst++[cmnt])++accu)) else accu 
          -- Just "composite" -> cassert hash key accu 
          Just x -> (Deny [Plain (Const ("Error at citem: unknown item: "++ x ++ " for key " ++ show(key) )) [] True]):accu 
          Nothing -> -- accu 
