@@ -100,6 +100,7 @@ onerule(Rid,One) :-
 % We construct a list from assertions,
 % starting with the first element. 
 apredlst(Aid,Pn,v(1,Val,nil)) :- 
+  %allow(Aid), 
   assert(Aid), 
   head(Aid,Hid), 
   pred(Hid,Pn), 
@@ -122,6 +123,7 @@ apredlst(Aid,Pn,v(1,Val,nil)) :-
 % the old list to the current list rather than 
 % recombining two lists. 
 apredlst(Aid,Pn,v(N+1,Val,v(N,Valold,X))) :- 
+  %allow(Aid), 
   apredlst(Aid,Pn,v(N,Valold,X)), 
   assert(Aid), 
   head(Aid,Hid), 
@@ -278,11 +280,12 @@ tconflict(Rid,Vn, Val1, Predid1, Val2, Predid2, X1, X2) :-
 % Structure is as follows:
 % Rid			ruleid
 % Pn			name of the predicate 
-% z(Idx,Vn,Val,Predid,Just,Rest) where 
+% z(Idx,Vn,Val,Predid,Aid,X,Rest) where 
 % Idx 		        index of the list position; this is also the position of the variable in the head
 % Vn			name of the variable 
 % Val 			value of the variable 
 % Predid		the ID of the predicate in the body of Rid
+% Aid			the source ID of this assignment
 % X                     the assignment list which produced this assignment,
 %                       maybe needed when the conflicts are resolved
 % nil                   marker for the rest of the v() list.
@@ -294,7 +297,8 @@ tconflict(Rid,Vn, Val1, Predid1, Val2, Predid2, X1, X2) :-
 vlist2(Rid,Pn,z(1, Vn, Val, Predid, Aid, X, nil) ) :- 
   visiblexassign(Rid,Vn,Val,Aid,X),
   % We need the variables bound by Predid. 
-  bodyvarpospre(Rid,Vn,Predid,Pos), 
+  % bodyvarpospre(Rid,Vn,Predid,Pos), 
+  headvarval(Rid,Pn,Pos,Vn,Predid,Bidx), 
   Pos == 1, 
   head(Rid,Hid),
   pred(Hid,Pn).
@@ -340,7 +344,8 @@ vlist2(Rid,Pn,z(1, Vn, Val, Predid, Aid, X, nil) ) :-
 vlist2(Rid,Pn,z(N+1, Vnnew, Valnew, Predidnew, Aid, X, z(N, Vnold, Valold, Predidold, Aidold, L, Rest) ) ) :- 
   vlist2(Rid,Pn,z(N, Vnold, Valold, Predidold, Aidold, L, Rest) ), 
   visiblexassign(Rid,Vnnew,Valnew,Aid,X),
-  bodyvarpospre(Rid,Vnnew,Predidnew,N+1), 
+  % bodyvarpospre(Rid,Vnnew,Predidnew,N+1), 
+  headvarval(Rid,Pn,N+1,Vnnew,Predidnew,Bidx), 
   head(Rid,Hid),
   pred(Hid,Pn), 
   % Now make sure that both lists are mutually compatible 
@@ -348,6 +353,9 @@ vlist2(Rid,Pn,z(N+1, Vnnew, Valnew, Predidnew, Aid, X, z(N, Vnold, Valold, Predi
   not xconflict(Rid,Vnnew, Valnew, Predidnew, Valold, Predidold, X, L).  % XXXXXXXXXXXXXXXXX
   %xcompatible(Rid,Vnnew,Valnew, X, L), 
   %xcompatible(Rid,Vnold,Valold, L, X). 
+
+
+
 
 
 %
@@ -384,7 +392,9 @@ nthinvlist2(Rid, Pn, N, Vn, Val, Predid, Aid, SrcL,
 	    z(N-1, Vnnxt, Valnxt, Predidnxt,Aidnxt,SrcLnxt,Rest), z(N, Vn, Val, Predid, Aid, SrcL, z(N-1, Vnnxt, Valnxt, Predidnxt,Aidnxt, SrcLnxt,Rest) ) ) 
 :- 
   vlist2(Rid, Pn, z(N, Vn, Val, Predid, Aid, SrcL, z(N-1, Vnnxt, Valnxt, Predidnxt,Aidnxt, SrcLnxt,Rest))),
-  bodycount(Rid,N). 
+  head(Rid,Hid), 
+  arity(Hid,N). 
+  % bodycount(Rid,N). 
 
 % Here we do the next step, using the previous item as base 
 nthinvlist2(Rid, Pn, N-1, Vn, Val, Predid, Aid, SrcL, Rest, Orig )
@@ -482,23 +492,34 @@ apredlst(Rid,Pn,L) :-
 %  vlist3(Rid,Pn, L, Pl, Y ),
 %  iprovenance(Y,Rid,Pn,Vn,Val,Aid). 
 
-subprovenance(id(L,0),Rid,Aid) :- 
+isubprovenance(id(L,0),Rid,Aid) :- 
   groundrule(Pn,L), 
   apredlst(Rid,Pn,L), 
   vlist3(Rid,Pn, L, Pl, Y ),
   iprovenance(Y,Rid,Pn,Vn,Val,Aid). 
-
-
 
 % And if the rule is evaluable, we project it to ground rule,
 % we could also mkassign it, perhaps to reuse old code of the dereifier
 % ... but we still continue with the abstract plan so that we dont have 
 % to take into account duplicate removal. 
 groundrule(Pn,v(N,Val,Rest)) :- 
+  % not same(Rid,Pn,v(N,Val,Rest)),
+  % novel(Rid,Pn,v(N,Val,Rest)),
   apredlst(Rid,Pn,v(N,Val,Rest)),
   head(Rid,Hid),
   arity(Hid,N), 
   evaluable(Rid). 
+
+%novel(Rid,Pn,L1) :- 
+%  apredlst(Rid,Pn,L1),
+%  apredlst(Rid,Pn,L2),
+%  L1 != L2. 
+
+%same(Rid,Pn,L1) :- 
+%  apredlst(Rid,Pn,L1),
+%  apredlst(Rid,Pn,L2),
+%  L1 == L2. 
+
 
 %%%%%%%%%%%%%%%%%%%%
 % Below we have essentially the same as vlist2, but with all the variables
@@ -745,16 +766,6 @@ compatibletandx(Rid,Compoundid,Xa,Ta) :-
   % They must be connected 
   rulecomposite(Rid,Compoundid). 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Now we are ready to try to tackle nonevaluable rules
-% hamilton_toground.lp.reified as example. 
-
-% First let's generate a head 
-hasrule(1,id(Id,0)) :- 
-  prnonevaluable(Rid), 
-  not cflctrassign(Rid,Id), 
-  rassign(Rid,Vn,Val1,Aid,Id).      % This is needed to access the ID 
-
 % Provenance for ground rules or nonevaluable rules. 
 %provenance(id(Id,0),Rid,"foobar",Vn,Val1,Aid) :- 
 %  prnonevaluable(Rid), 
@@ -768,51 +779,71 @@ hasrule(1,id(Id,0)) :-
 %  flist(Rid,Id,Aid),
 %  rassign(Rid,Vn,Val1,TmpAid,Id).   
 
-subprovenance(id(Id,0),Rid,Aid) :- 
+isubprovenance(id(Id,0),Rid,Aid) :- 
   prnonevaluable(Rid), 
   not cflctrassign(Rid,Id), 
   flist(Rid,Id,Aid),
   rassign(Rid,Vn,Val1,TmpAid,Id).   
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Now we are ready to try to tackle nonevaluable rules
+% hamilton_toground.lp.reified as example. 
+
+% First let's generate a head 
+hasrule(1,id(Id,0)) :- 
+  prnonevaluable(Rid), 
+  not cflctrassign(Rid,Id), 
+  allow(id(Id,0)), 
+  rassign(Rid,Vn,Val1,Aid,Id).      % This is needed to access the ID 
+
   
 
 rule(id(Id,0)) :- 
+  % Here starts the common bit
   prnonevaluable(Rid), 
   not constraint(Rid), 
   not cflctrassign(Rid,Id), 
+  allow(id(Id,0)), 
   rassign(Rid,Vn,Val1,Aid,Id).      % This is needed to access the ID 
 
 constraint(id(Id,0)) :- 
   prnonevaluable(Rid), 
   constraint(Rid), 
   not cflctrassign(Rid,Id), 
+  allow(id(Id,0)), 
   rassign(Rid,Vn,Val1,Aid,Id).      % This is needed to access the ID 
   
 ground(id(Id,0)) :- 
   prnonevaluable(Rid), 
   not cflctrassign(Rid,Id), 
+  allow(id(Id,0)), 
   rassign(Rid,Vn,Val1,Aid,Id). 
 
 newname(id(Id,0),"HUU",Rid) :- 
   prnonevaluable(Rid), 
   not cflctrassign(Rid,Id), 
+  allow(id(Id,0)), 
   rassign(Rid,Vn,Val1,Aid,Id). 
 
 pos(id(Id,1)) :- 
   prnonevaluable(Rid), 
   not constraint(Rid), 
   not cflctrassign(Rid,Id), 
+  allow(id(Id,0)), 
   rassign(Rid,Vn,Val1,Aid,Id). 
 
 head(id(Id,0),id(Id,1)) :- 
   prnonevaluable(Rid), 
   not constraint(Rid), 
   not cflctrassign(Rid,Id), 
+  allow(id(Id,0)), 
   rassign(Rid,Vn,Val1,Aid,Id). 
 
 pred(id(Id,1), Pn ) :- 
   prnonevaluable(Rid), 
   not constraint(Rid), 
   not cflctrassign(Rid,Id), 
+  allow(id(Id,0)), 
   rassign(Rid,Vn,Val1,Aid,Id),
   head(Rid,Hid), 
   pred(Hid,Pn). 
@@ -825,12 +856,14 @@ alist(id(Id,1),N,id(Id,1+N)) :-
   head(Rid,Hid), 
   alist(Hid,N,Vid),
   var(Vid,Vn),
+  allow(id(Id,0)), 
   rassign(Rid,Vn,Val1,Aid,Id). 
 
 cnst(id(Id,1+N),Val1) :- 
   prnonevaluable(Rid), 
   not constraint(Rid), 
   not cflctrassign(Rid,Id), 
+  allow(id(Id,0)), 
   rassign(Rid,Vn,Val1,Aid,Id),
   head(Rid,Hid), 
   alist(Hid,N,Vid),
@@ -841,6 +874,7 @@ apredlst(Id,Pn,v(1,Val1,nil) ) :-
   prnonevaluable(Rid), 
   not constraint(Rid), 
   not cflctrassign(Rid,Id), 
+  allow(id(Id,0)), 
   rassign(Rid,Vn,Val1,Aid,Id),
   head(Rid,Hid), 
   pred(Hid,Pn),
@@ -852,6 +886,7 @@ apredlst(Id,Pn,v(N+1,Val1,v(N,Valold,Rest)) ) :-
   not constraint(Rid), 
   prnonevaluable(Rid), 
   not cflctrassign(Rid,Id), 
+  allow(id(Id,0)), 
   rassign(Rid,Vn,Val1,Aid,Id),
   head(Rid,Hid), 
   pred(Hid,Pn),
@@ -876,6 +911,7 @@ apredlst(Id,Pn,v(N+1,Val1,v(N,Valold,Rest)) ) :-
 protobodylist(Rid, N, A2, Predid, id(Id,1), id(Id,Predid), Id) :- 
   prnonevaluable(Rid), 
   not cflctrassign(Rid,Id), 
+  allow(id(Id,0)), 
   rassign(Rid,Vn,Val1,Aid,Id),
   %head(Rid,Hd), 
   %arity(Hd,A),              % Arity A means that there been 1+A new IDs for the head
@@ -1127,6 +1163,13 @@ nonevaluable(Rid,Bid) :-
   body(Rid,Bid), 
   constraint(Rid). 
 
+%  A bop is, for now, always noneval, will be grounded
+nonevaluable(Rid,Bid) :- 
+  % bodylist(Rid,N,Bid), 
+  bexpr(Rid,Bid). 
+
+
+
 % A rule refers to a nonevaluable rule 
 nonevaluable(Rid1,Bid1) :- 
   body(Rid1,Bid1), 
@@ -1141,6 +1184,111 @@ prnonevaluable(Rid) :- nonevaluable(Rid,Bid).
 evaluable(Rid) :- 
   body(Rid,Bid), 
   not prnonevaluable(Rid). 
+
+
+% Variable safety: for each variable in rule there exists 
+% a positive predicate with that variable in body. 
+safevar(Rid,Vn) :- 
+  % There is a variable named Vn
+  rulevar(Rid,Vid), 
+  var(Vid,Vn), 
+  % Variable with same name is in a predicate within body.
+  alist(Predid,N,Vid2),
+  var(Vid2,Vn),
+  % rulepred(Rid,Predid),
+  not head(Rid,Predid), 
+  pos(Predid). 
+
+unsafevar(Rid,Vn) :- 
+  not safevar(Rid,Vn), 
+  rulevar(Rid,Vid), 
+  var(Vid,Vn). 
+
+unsaferule(Rid) :- unsafevar(Rid,Vn). 
+
+% Make accessors for provenance lists, which are constructed
+% somewhere else and hence can be accessed by peeling off until nil. 
+nthinffprov(N, Id, ff(N-1,Id2,Rest2),ff(N,Id,ff(N-1,Id2,Rest2))) :- 
+  isubprovenance(Aid,Rid, ff(N,Id,ff(N-1,Id2,Rest2)) ). 
+  
+nthinffprov(N-1, Id, Rest,Orig) :- 
+  nthinffprov(N, Idprev, ff(N-1	,Id,Rest), Orig). 
+
+% We should ahndle the case with only one item and immediate nil...
+
+% Now make a comparison of the stuff in provenance 
+%diffprov(Aid,Rid,P1,P2) :- 
+%  subprovenance(Aid,Rid, P ),
+%  nthinffprov(N1,C1,R1,P), 
+%  nthinffprov(N2,C2,R2,P), 
+%  prov(C1,P1),
+%  prov(C2,P2), 
+%  P1 != P2, 
+%  N1 != N2.
+
+% We need a separate for provenances of length one
+
+% This is from rule point of view. 
+admitprov(Aid,Rid,P) :- 
+  isubprovenance(Aid,Rid, P ),
+  nthinffprov(N1,C1,R1,P), 
+  prov(C1,P1),
+  whitelist(Rid,P1), 
+  nthinffprov(N2,C2,R2,P), 
+  prov(C2,P2),
+  whitelist(Rid,P2),
+  N1 != N2.
+
+% This is from Data point of view
+% admitprov(Aid,Rid,P) :- 
+admitdata(Aid,Rid,P) :- 
+  isubprovenance(Aid,Rid, P ),
+  nthinffprov(N1,C1,R1,P), 
+  prov(C1,P1),
+  whitelist(C1,P2), 
+  nthinffprov(N2,C2,R2,P), 
+  prov(C2,P2),
+  N1 != N2.
+
+
+% The rule point of view
+denyprov(Aid,Rid,P) :- 
+  isubprovenance(Aid,Rid,P),
+  nthinffprov(N1,C1,R1,P), 
+  prov(C1,P1),
+  not whitelist(Rid,P1). 
+
+% This is the data point of view 
+% denyprov(Aid,Rid,P) :- 
+denydata(Aid,Rid,P) :- 
+  isubprovenance(Aid,Rid,P),
+  nthinffprov(N1,C1,R1,P), 
+  prov(C1,P1),
+  whitelist(C1,P1), 
+  nthinffprov(N2,C2,R2,P), 
+  prov(C2,P2),
+  not whitelist(C1,P2). 
+
+
+% Admit subrpovenance only after the filtering 
+subprovenance(Aid,Rid,P) :- 
+  isubprovenance(Aid,Rid,P),
+  admitprov(Aid,Rid,P),
+  not denydata(Aid,Rid,P). 
+
+% Next we only allow an Aid if it has at least one admitprov. 
+allow(Aid) :- 
+  admitprov(Aid,Rid,P1),
+  not denyprov(Aid,Rid,P1),
+  admitdata(Aid,Rid,P2),
+  not denydata(Aid,Rid,P2),
+  P1 == P2. 
+
+aandd(Aid,Rid,P1) :- 
+  admitprov(Aid,Rid,P1),
+  denydata(Aid,Rid,P2),
+  P1 == P2. 
+
 
 % #hide. 
 
@@ -1164,4 +1312,7 @@ evaluable(Rid) :-
 #show constraint/1. 
 #show provenance/6.
 #show subprovenance/3.
+#show safevar/2.
+#show unsafevar/2.
+#show unsaferule/1.
 
