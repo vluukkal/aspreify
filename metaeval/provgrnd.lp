@@ -987,7 +987,7 @@ neg(id(Id,Ta,Compoundid)) :-
 % alist(id(Id,Ta,Compoundid),N,id(Id,Ta,Vid), Vlist, Predid) :- 
 alist(id(Id,Ta,Compoundid),N,id(Id,Ta,Vid)) :- 
   typedbody(id(Id,0), id(Id,Ta,Compoundid)),
-  nthintypedlist(Compoundid,1,Qid,Vlist,Tmp1,Ta), % Compoundid: 63 
+  nthintypedlist(Compoundid,1,Qid,Vlist,Tmp1,Ta), 
   % The source platform 
   tlist(Compoundid,1,Form), 
   qual(Form, Predid),
@@ -996,7 +996,7 @@ alist(id(Id,Ta,Compoundid),N,id(Id,Ta,Vid)) :-
 
 cnst(id(Id,Ta,Vid), Val) :- 
   typedbody(id(Id,0), id(Id,Ta,Compoundid)),
-  nthintypedlist(Compoundid,1,Qid,Vlist,Tmp1,Ta), % Compoundid: 63 
+  nthintypedlist(Compoundid,1,Qid,Vlist,Tmp1,Ta), 
   tlist(Compoundid,1,Form), 
   qual(Form, Predid),
   % pred(Predid,Pn), 
@@ -1278,16 +1278,21 @@ subprovenance(Aid,Rid,P) :-
 
 % Next we only allow an Aid if it has at least one admitprov. 
 allow(Aid) :- 
+% allow_rule_and_data(Aid) :- 
   admitprov(Aid,Rid,P1),
   not denyprov(Aid,Rid,P1),
   admitdata(Aid,Rid,P2),
   not denydata(Aid,Rid,P2),
   P1 == P2. 
 
-aandd(Aid,Rid,P1) :- 
+allow_rule_only(Aid) :- 
+%allow(Aid) :- 
   admitprov(Aid,Rid,P1),
-  denydata(Aid,Rid,P2),
-  P1 == P2. 
+  not denyprov(Aid,Rid,P1). 
+
+
+
+
 
 
 % #hide. 
