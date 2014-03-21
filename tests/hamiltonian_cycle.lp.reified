@@ -1,3 +1,4 @@
+%
 % Inputfile: hamiltonian_cycle.lp
 % {hc(X , Y)  :  arc(X , Y)} 1 :- 
 % 	 vtx(X).
