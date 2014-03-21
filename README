@@ -39,22 +39,19 @@ Requires Haskell platform (http://www.haskell.org/platform/), tested on 2012.2.0
 To produce an executable:
 > ghc -O2 -o aspreify main.hs rdfrender.hs txtrender.hs factrender.hs aspparse.hs dereify.hs
 
-Alternatively, to enable RTS options 
+Alternatively, to enable RTS options to execute with large stack sizes
 > ghc -rtsopts -O2 -o aspreify main.hs rdfrender.hs txtrender.hs factrender.hs aspparse.hs dereify.hs
-
-And run with e.g. increased stack size:
-> ./aspreify +RTS -K128M -RTS -d tests/hamiltonian_cycle.lp.reified
 
 Obtain the sources initially:
 > git clone -b propproject git://www.github.com/vluukkal/aspreify
 
 Update later on after initially fetching them: 
-> git remote update
+> git pull
 
 To run whole metagrounding chain:
 
-> ./ground.sh tests/ground_input/uncle3.lp 
-produces uncle3.lp.reified.res
+> ./ground.sh tests/uncle3.lp 
+produces tests/uncle3.lp.reified.res
 
 Some simple examples highlighting particular features of aspreify:
 
@@ -70,15 +67,18 @@ tests/hamiltonian_cycle.lp.lp
 The reified result is RDF/N3-like format produced to 
 tests/hamiltonian_cycle.lp.ssls
 
-> ./aspreify -d tests/hamiltonian_cycle.lp.reified 
+> ./aspreify -d tests/uncle.lp.reified 
 The result is corresponding set of dereified rules produced to 
-tests/hamiltonian_cycle.lp.reified.dereified  
+tests/uncle.lp.reified.dereified  
 
 > ./aspreify -g tests/hamiltonian_cycle.lp.reified 
 The result is corresponding set of dereified and ground rules 
 produced to 
 tests/hamiltonian_cycle.lp.reified.ground
 Only ground rules are produced, other rules (with variables) are ignored. 
+
+Run with increased stack size:
+> ./aspreify +RTS -K128M -RTS -d tests/uncle.lp.reified
 
 
 2. Limitations 
