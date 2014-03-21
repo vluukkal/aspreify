@@ -46,7 +46,7 @@ And run with e.g. increased stack size:
 > ./aspreify +RTS -K128M -RTS -d tests/hamiltonian_cycle.lp.reified
 
 Obtain the sources initially:
-> git clone git://www.github.com/vluukkal/aspreify
+> git clone -i propproject git://www.github.com/vluukkal/aspreify
 
 Update later on after initially fetching them: 
 > git remote update
