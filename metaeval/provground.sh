@@ -21,11 +21,23 @@ do
     shift
 done
 
+if [ ! -f $metagrounder ]; then 
+    echo "Must define path to metagrounder rules with -m"
+    echo "usage: $0 [-m metagrounderfile] [-a aspreify] [file ...]"
+    exit 1
+fi 
+
+if [ ! -f $aspreify ]; then 
+    echo "Must define path to metagrounder rules with -m"
+    echo "usage: $0 [-m metagrounderfile] [-a aspreify] [file ...]"
+    exit 1
+fi 
+
 if [ $# -gt 0 ]; then 
     reified=$1
 else 
     echo "Must have an input file"
-    echo "usage: $0 [-m metagrounderfile] [file ...]"
+    echo "usage: $0 [-m metagrounderfile] [-a aspreify] [file ...]"
     exit 1
 fi 
 
