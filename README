@@ -82,21 +82,7 @@ Note that you may need to set the paths for aspreify and the metagrounder
 in provground.sh to fit your system and installation using -m and -a flags. 
 
 
-2.4 Metagrounding
-
-To run whole metagrounding chain:
-
-> cd metaeval 
-> ../aspreify hamilton_toground.lp
-> ./provground.sh hamilton_toground.lp.reified
-
-The results will appear in smres1.lp.ground. 
-
-An earlier version of grounding using variable bindings, left here for
-posterity: 
-
-> ./ground.sh tests/uncle3.lp 
-produces tests/uncle3.lp.reified.res
+2.3 Examples
 
 Some simple examples highlighting particular features of aspreify:
 
@@ -121,6 +107,13 @@ The result is corresponding set of dereified and ground rules
 produced to 
 tests/hamiltonian_cycle.lp.reified.ground
 Only ground rules are produced, other rules (with variables) are ignored. 
+
+An earlier version of grounding using variable bindings, left here for
+posterity: 
+
+> ./ground.sh tests/uncle3.lp 
+produces tests/uncle3.lp.reified.res
+
 
 Run with increased stack size:
 > ./aspreify +RTS -K128M -RTS -d tests/uncle.lp.reified
