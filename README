@@ -48,7 +48,52 @@ Obtain the sources initially:
 Update later on after initially fetching them: 
 > git pull
 
+2. Use cases 
+
+The directory metaeval/ contains some example programs to show potential
+applications for reification. 
+
+2.1 Metaevaluation 
+
+metaeval/simple_variable_free.lp contains a simplistic program with no variables
+and metaeval/meta.lp contains a metaevaluator for variable-free answer set programs. 
+
+1. Reify the program: ./aspreify metaeval/simple_variable_free.lp
+   to produce metaeval/simple_variable_free.lp.reified 
+2. Combine the metaevaluator with the reified program: 
+   cat metaeval/meta.lp metaeval/simple_variable_free.lp.reified > metaeval/x.lp
+3. Calculate the answer sets: gringo metaeval/x.lp | clasp -n 0 
+   Compare this with direct evaluation: 
+   lparse metaeval/simple_variable_free.lp | smodels 0
+   Or with 
+   gringo metaeval/x.lp | clasp -n 0 
+
+2.2 Metagrounding 
+
+A quick test of metagrounding with timing information:
+0. cd metaeval/
+1. Run the grounding for the example with timing information:
+   ./timedground.sh timed_hamilton_toground.lp.reified 
+   which will produce a directory 'timed_hamilton_toground$date_$time'
+2. The result is available in: 
+   timed_hamilton_toground$date_$time/output/smres1.lp.ground
+   
+Note that you may need to set the paths for aspreify and the metagrounder 
+in provground.sh to fit your system and installation using -m and -a flags. 
+
+
+2.4 Metagrounding
+
 To run whole metagrounding chain:
+
+> cd metaeval 
+> ../aspreify hamilton_toground.lp
+> ./provground.sh hamilton_toground.lp.reified
+
+The results will appear in smres1.lp.ground. 
+
+An earlier version of grounding using variable bindings, left here for
+posterity: 
 
 > ./ground.sh tests/uncle3.lp 
 produces tests/uncle3.lp.reified.res
@@ -80,16 +125,15 @@ Only ground rules are produced, other rules (with variables) are ignored.
 Run with increased stack size:
 > ./aspreify +RTS -K128M -RTS -d tests/uncle.lp.reified
 
+3. Limitations 
 
-2. Limitations 
-
-2.1 Error handling 
+3.1 Error handling 
 
 Error handling is rudimentary, syntax errors are reported, but often
 indicated to be after the actual error. Errors are not signaled with the
 return values, but the result file contains the syntax error.
 
-2.2 Issues in input syntax
+3.2 Issues in input syntax
 
 All of the examples in lparse distribution examples/ directory are parsed. 
 
@@ -113,7 +157,7 @@ constructs:
 - maximize, minimize, compute, function, external, show, hide 
 - #show, #hide
 
-3. Self tests 
+4. Self tests 
 
 Compile the parser test suite and run it:
 > ghc -o runparsertests testaspparse.hs aspparse.hs 
@@ -123,40 +167,6 @@ Run the grounding tests:
 > cd tests
 > for i in ground_input/*; do ./rungroundtest.sh $i; done 
 
-4. Use cases 
-
-The directory metaeval/ contains some example programs to show potential
-applications for reification. 
-
-4.1 Metaevaluation 
-
-metaeval/simple_variable_free.lp contains a simplistic program with no variables
-and metaeval/meta.lp contains a metaevaluator for variable-free answer set programs. 
-
-1. Reify the program: ./aspreify metaeval/simple_variable_free.lp
-   to produce metaeval/simple_variable_free.lp.reified 
-2. Combine the metaevaluator with the reified program: 
-   cat metaeval/meta.lp metaeval/simple_variable_free.lp.reified > metaeval/x.lp
-3. Calculate the answer sets: gringo metaeval/x.lp | clasp -n 0 
-   Compare this with direct evaluation: 
-   lparse metaeval/simple_variable_free.lp | smodels 0
-   Or with 
-   gringo metaeval/x.lp | clasp -n 0 
-
-4.2 Metagrounding 
-
-A quick test of metagrounding:
-0. cd metaeval/
-1. Reify the data and the payload rules: 
-   ../aspreify hamilton_toground.lp 
-2. Run the grounding:
-   ./provground.sh hamilton_toground.lp.reified 
-   which will produce a directory 'hamilton_toground$date_$time'
-3. The result is available in: 
-   hamilton_toground$date_$time/output/smres1.lp.ground
-   
-Note that you may need to set the paths in provground.sh to fit your 
-system and installation. 
 
 5. Other
 
