@@ -34,10 +34,13 @@ import Control.Monad
 
 import Text.ParserCombinators.Parsec -- just to get the ParseError type
 
-
 import AspParse
 
 import TxtRender
+
+-- Only for debugging 
+-- import Debug.Trace 
+
 
 -- This is really anti-idiomatic in haskell, we build a great big
 -- record of hashes which we update upon every new fact. 
@@ -55,6 +58,9 @@ data IntermediateR = IntermediateR {
      rulesh      :: (M.Map String [String]),
      headsh      :: (M.Map String [String]),
      bodysh      :: (M.Map String [String]),
+     cardsh      :: (M.Map String [String]),
+--     maxcardsh   :: (M.Map String [String]),
+--     mincardsh   :: (M.Map String [String]),
      posh      :: (M.Map String [String]),
      negh      :: (M.Map String [String]),
      predsh      :: (M.Map String [String]),
@@ -74,6 +80,7 @@ data IntermediateR = IntermediateR {
      pfalse     :: (M.Map String String),
      newfact     :: (M.Map String String),
      provenancesh :: (M.Map String [String]),
+     unsaferls :: (M.Map String Bool),
      idtoprovh :: (M.Map String (M.Map String String)), -- Like mkassigns 
      subprovenancesh :: (M.Map String [String]),
      -- xpand     :: (M.Map (String,String) (M.Map String String)),
@@ -90,12 +97,12 @@ emptyIntermediate x =
   IntermediateR {
        doground = x, 
        rulesh = M.empty, hasrulesh = M.empty, 
-       headsh = M.empty, bodysh = M.empty, posh = M.empty, negh = M.empty,
+       headsh = M.empty, bodysh = M.empty, cardsh = M.empty, posh = M.empty, negh = M.empty,
        predsh = M.empty, varsh = M.empty, alisth = M.empty, typeh = M.empty, 
        largh = M.empty, rargh = M.empty, boph = M.empty,tlisth = M.empty, 
        quals = M.empty, composedh = M.empty, mkassigns = M.empty, rassigns = M.empty, 
        ptrue = M.empty, pfalse = M.empty, newfact = M.empty, truerule = M.empty, provenancesh = M.empty, subprovenancesh = M.empty, 
-       idtoprovh = M.empty, xpand = M.empty, bexprh = M.empty, constsh = M.empty, emptyh = M.empty, groundh = M.empty}
+       unsaferls = M.empty, idtoprovh = M.empty, xpand = M.empty, bexprh = M.empty, constsh = M.empty, emptyh = M.empty, groundh = M.empty}
 
 collectb :: t -> t1 -> Body
 collectb rls bdy = Empty 
@@ -140,6 +147,7 @@ assigntohash hs nm bdy neg =
                         hs { typeh = newhs }
        --}
       "rule" ->  addtype bdy nm 0
+      "card" ->  addtype bdy nm 0
       "composite" ->  addtype bdy nm 0
       "constraint" -> addtype bdy nm 0
       "assert" -> addtype bdy nm 0
@@ -150,7 +158,8 @@ assigntohash hs nm bdy neg =
                 let tmphs = headsh hs in 
                 -- let newhs = M.insertWith (++) src [trgt] tmphs in
                 let newhs = M.insertWith updlst src [trgt] tmphs in
-                       hs { headsh = newhs }
+                       (hs { headsh = newhs })
+                       -- trace ("head updating with " ++ show(src) ++ ":" ++ show(trgt)) (hs { headsh = newhs })
       "qual" -> let src = getarg bdy 0 in 
                 let trgt = getarg bdy 1 in 
                 let tmphs = quals hs in 
@@ -358,9 +367,15 @@ assigntohash hs nm bdy neg =
                   where 
                       updvr :: Ord k => M.Map k a -> M.Map k a -> M.Map k a
                       updvr newh oldh = M.union oldh newh
-      otherwise -> let tmphs = emptyh hs in 
+      "unsaferule" -> let newhs = M.insert (getarg bdy 0) True (unsaferls hs) in
+                       hs { unsaferls = newhs }
+      otherwise -> -- trace ("Ignoring " ++ show(nm) ++ " " ++ show(bdy) ) hs 
+                     hs 
+                    {-- 
+                   let tmphs = emptyh hs in 
                    let newhs = M.insert nm [""] tmphs in
                        hs { emptyh = newhs }
+                    --}
       where 
             addtype b val idx = 
                  let src = getarg b idx in 
@@ -416,6 +431,14 @@ isruleground h k =
        Just x -> True 
        -- Nothing -> False 
        Nothing -> (iskeyassert h k)
+
+isruleunsafe h k = 
+  let unsafebit = M.lookup k (unsaferls h) in 
+  case unsafebit of 
+       Just x -> True 
+       Nothing -> False 
+       -- Nothing -> (iskeyassert h k)
+
 
 iskeyassert h k = 
   let isassert = M.lookup k (typeh h) in 
@@ -475,18 +498,20 @@ citem handleall hash key accu =
                          Nothing -> [(RComment "no idprovs")]
       in 
       case tp of 
-         Just "rule" -> checkground key hash' (crule hash' key ((provlst++idprovlst++[cmnt])++accu)) accu 
+         Just "rule" -> -- trace ("Handling rule for ID" ++ show key) (checkground key hash' (crule hash' key ((provlst++idprovlst++[cmnt])++accu)) accu)
+                     (checkground key hash' (crule hash' key ((provlst++idprovlst++[cmnt])++accu)) accu)
          Just "constraint" -> checkground key hash' (cconstraint hash' key ((provlst++idprovlst++[cmnt])++accu)) accu 
-         Just "assert" -> if handleall then (cassert hash' key (provlst++idprovlst++[cmnt]++accu)) else 
+         Just "assert" -> if ((handleall) && (not (isruleunsafe hash' key) ) ) then (cassert hash' key (provlst++idprovlst++[cmnt]++accu)) else 
                           -- Check here if this is newly generated one. 
-                          if (M.member key (newfact hash') ) then (cassert hash' key ((provlst++idprovlst++[cmnt])++accu)) else accu 
+                          if ((M.member key (newfact hash') ) ) then (cassert hash' key ((provlst++idprovlst++[cmnt])++accu)) else accu 
          -- Just "composite" -> cassert hash key accu 
+         -- Just "card" -> accu 
          Just x -> (Deny [Plain (Const ("Error at citem: unknown item: "++ x ++ " for key " ++ show(key) )) [] True]):accu 
          Nothing -> -- accu 
                    (Deny [Plain (Const ("Error at citem: unknown ID: "++key )) [] True]):accu 
    where 
       checkground id h func accu = 
-        if (nullorbogus h) && (doground h) && not (isruleground h id)  -- (not (M.member id (newfact h) ))
+        if (nullorbogus h) && (doground h) && not (isruleground h id) -- &&  (isruleunsafe  h id) -- (not (M.member id (newfact h) ))
         -- then (RComment ("Not grounding: " ++ show(key) ++ " -- " ++ (show h))):accu 
         -- then (RComment ("Not grounding: " ++ show(key) ++ " -- " ++ show(doground h))):accu 
         then accu 
@@ -533,7 +558,8 @@ crule hash key accu =
 
 crule :: IntermediateR -> String -> [Rules] -> [Rules]
 crule hash key accu = 
-   let unnecessary = M.lookup key (truerule hash) in 
+   -- let unnecessary = trace("crule looking up " ++ show(key) ) (M.lookup key (truerule hash)) in 
+   let unnecessary = (M.lookup key (truerule hash)) in 
    case unnecessary of 
       Nothing -> 
         fullrule hash key accu 
@@ -546,10 +572,13 @@ crule hash key accu =
         let bdksm = M.lookup key (bodysh hash) in 
         case (hdkm,bdksm) of 
            (Just hdk, Just bdks) -> 
+              -- let hdc = trace ("crule obtaining head:"++show(hdk)++" with body "++show(bdks)) (chead hash (L.head hdk)) in 
               let hdc = chead hash (L.head hdk) in 
               let bdls = L.foldr (cbody hash) [] bdks in 
                   ((Rule hdc bdls):accu)
-           (_,_) -> ((RComment ("crule no key " ++ show(key))):accu)
+           (Nothing,Nothing) -> ((RComment ("crule no body or head for key " ++ show(key))):accu)
+           (_,Nothing) -> ((RComment ("crule no body for key " ++ show(key))):accu)
+           (Nothing,_) -> ((RComment ("crule no head for key " ++ show(key))):accu)
               
 
 
@@ -597,7 +626,23 @@ crule' hash key v accu =
          -- try sequence from control monad
 
 chead h k = 
-      cpred h k 
+      -- trace("chead is plain for key " ++ show(k)) (cpred h k )
+      cpred h k
+
+-- Check what kind of head we are dealing with 
+-- Use this when building the cardinalities. 
+-- We need to make cpre return [body] and possibly
+-- adapt higher layers. 
+{--
+chead' h k = 
+      let tp = M.lookup k (typeh h) in 
+      case tp of 
+           Just "card" -> 
+                let bdksm = M.lookup k (bodysh h) in 
+                case bdksm of 
+                  Just bdks -> trace("chead/card for key " ++ show(k)) (cbody h k [])
+           _ -> trace("chead is plain for key " ++ show(k)) (cpred h k )
+--}
 
 cbody :: IntermediateR -> String -> [Body] -> [Body]
 cbody hash key accu = 
@@ -778,7 +823,9 @@ cpred h k =
              let ispos = (M.member k (negh h)) in -- && (not (M.member k (posh h) )) in 
              (Plain (Const (rmquot (L.head pn))) oargs' (not ispos))
              -- (Comment ("cpred for key: " ++ show(k) ++ " args:" ++ show(args) ++ " args':" ++ show(args') ++ " oargs:" ++ show(oargs) ++ " oargs':" ++ show(oargs')  ))
-         (_,_) -> (Comment ("cpred: no key " ++ show(k) ))
+         (Nothing,Nothing) -> (Comment ("cpred: no predicate or args for key " ++ show(k) ))
+         (_,Nothing) -> (Comment ("cpred: no predicate for key " ++ show(k) ))
+         (Nothing,_) -> (Comment ("cpred: no args for key " ++ show(k) ))
     where 
       myc (i1,v1) (i2,v2) = i1 `compare` i2
         
