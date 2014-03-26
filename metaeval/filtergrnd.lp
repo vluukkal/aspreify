@@ -1079,7 +1079,7 @@ hastime(Aid) :-
 
 mytime(@gettime()). 
 
-% #hide. 
+#hide. 
 
 #show rule/1. 
 #show ground/1. 
