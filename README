@@ -160,6 +160,11 @@ Run the grounding tests:
 > cd tests
 > for i in ground_input/*; do ./rungroundtest.sh $i; done 
 
+A generator to produce random rules parametrized by seed and size.
+For now produces unparsable nonsense. 
+> ghc -o rlsgen rlsgen.hs aspparse.hs txtrender.hs 
+> ./rlsgen 2 10 
+
 
 5. Other
 
