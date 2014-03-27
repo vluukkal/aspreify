@@ -26,6 +26,9 @@
 -- :l Qcaspparse.hs 
 -- Commandlines in comments at instance Arbitrary.  
 -- 
+-- Render rules back to text:
+-- let rls = unGen (arbitrary :: Gen [Rules]) (System.Random.mkStdGen 2) 10
+-- let txt = TxtRender.txtrender (Right rls)
 
 
 module Qcaspparse where 
@@ -45,7 +48,7 @@ import Control.Applicative
 
 -- This module to test 
 import AspParse
-
+-- import TxtRender
 
 nmchar c = 
   c `elem` ['A'..'Z'] ++ ['a' .. 'z'] ++ ['_','-'] ++ ['0' .. '9']
@@ -74,7 +77,7 @@ instance Arbitrary BOp where
   arbitrary =
     elements [AspParse.Gt, AspParse.Lt,AspParse.GtEq,AspParse.LtEq,AspParse.Eq,AspParse.Neq,AspParse.Eqeq]
 
--- Now Stmt, we need to control the size to avoid 
+-- Now MyExpr, we need to control the size to avoid 
 -- unchecked recursion. 
 -- Check this as well:
 -- http://stackoverflow.com/questions/15959357/quickcheck-arbitrary-instances-of-nested-data-structures-that-generate-balanced?rq=1
@@ -83,7 +86,6 @@ instance Arbitrary BOp where
 
 instance Arbitrary MyExpr where 
   arbitrary = sized arbMyExpr 
-
 
 -- At depth 0 we force the result to be a leaf, that is, Number or Sym.  
 arbMyExpr :: Int -> Gen MyExpr
@@ -115,3 +117,144 @@ arbMyExpr n | n > 0 = do
                flag <- elements [True, False]
                return $ Func fname exprs flag  
                
+
+-- unGen (arbitrary :: Gen Body) (System.Random.mkStdGen 2) 10
+-- Empty 
+-- unGen (arbitrary :: Gen Body) (System.Random.mkStdGen 3) 10
+-- not empty ...
+
+instance Arbitrary Body where 
+  arbitrary = sized arbBody 
+
+-- At depth 0 we force the result to be a leaf. 
+arbBody :: Int -> Gen Body
+arbBody 0 = oneof [liftM3 Plain  (arbitrary :: Gen Atom) (arbitrary :: Gen [MyExpr]) arbitrary, 
+                   liftM3 BExpr arbitrary arbitrary arbitrary,                    
+                   liftM2 Assign arbitrary arbitrary, 
+                   liftM2 Arity arbitrary arbitrary, 
+                   Comment <$> arbitrary,
+                   return Empty
+                   ] 
+
+arbBody n | n > 0 = do 
+  m <- choose (1,12) :: Gen Int 
+  case m of 
+       -- leaf
+       1 -> liftM3 Plain  (arbitrary :: Gen Atom) (arbitrary :: Gen [MyExpr]) arbitrary
+       2 -> do -- Card MyExpr MyExpr [Body] Bool
+               myexprbot <- arbitrary 
+               myexprtop <- arbitrary 
+               -- limit the size of the list to 20 
+               repeat <- choose(1,20) 
+               let n' = n `div` (repeat + 1)
+               bodies <- replicateM repeat (arbBody n')
+               flag <- arbitrary 
+               return $ Card myexprbot myexprtop bodies flag 
+       3 -> do -- Count MyExpr MyExpr [Body] Bool
+               myexprbot <- arbitrary 
+               myexprtop <- arbitrary 
+               -- limit the size of the list to 20 
+               repeat <- choose(1,20) 
+               let n' = n `div` (repeat + 1)
+               bodies <- replicateM repeat (arbBody n')
+               flag <- arbitrary 
+               return $ Count myexprbot myexprtop bodies flag 
+       4 -> do -- Optimize Bool [Body] Bool
+               -- limit the size of the list to 20 
+               fst <- arbitrary 
+               repeat <- choose(1,20) 
+               let n' = n `div` (repeat + 1)
+               bodies <- replicateM repeat (arbBody n')
+               snd <- arbitrary 
+               return $ Optimize fst bodies snd
+       5 -> do -- Typed [Body] 
+               -- limit the size of the list to 20 
+               repeat <- choose(1,20) 
+               let n' = n `div` (repeat + 1)
+               bodies <- replicateM repeat (arbBody n')
+               return $ Typed bodies 
+       6 -> do -- Weighed MyExpr Body Bool
+               -- limit the size of the list to 20 
+               myexpr <- arbitrary 
+               body <- arbitrary 
+               flag <- arbitrary 
+               return $ Weighed myexpr body flag 
+       -- leaf
+       7 -> liftM3 BExpr arbitrary arbitrary arbitrary
+       -- leaf
+       8 -> liftM2 Assign arbitrary arbitrary
+       9 -> do -- Assignment Atom Body Bool
+               myatom <- arbitrary 
+               body <- arbitrary 
+               flag <- arbitrary 
+               return $ Assignment myatom body flag 
+       -- leaf
+       10 -> liftM2 Arity arbitrary arbitrary
+       -- leaf
+       11 -> Comment <$> arbitrary
+       -- leaf
+       12 -> return Empty
+        
+
+-- unGen (arbitrary :: Gen Rules) (System.Random.mkStdGen 2) 10
+-- unGen (arbitrary :: Gen [Rules]) (System.Random.mkStdGen 2) 10
+
+instance Arbitrary Rules where 
+  arbitrary = sized arbRules 
+
+arbRules :: Int -> Gen Rules 
+arbRules 0 = oneof [
+                   RComment <$> arbitrary,
+                   return Emptyset
+                   ] 
+
+arbRules n | n > 0 = do 
+  m <- choose (1,15) :: Gen Int 
+  case m of 
+       -- leaf
+       1 -> do 
+               bodies <- mkbodies n
+               return $ Deny bodies 
+       2 -> do 
+               mkbodies2 Deny n
+       3 -> do 
+               mkbodies2 Fact n
+       4 -> do 
+               mkbodies2 Show n
+       5 -> do 
+               mkbodies2 GShow n
+       6 -> do 
+               mkbodies2 Hide n
+       7 -> do 
+               mkbodies2 GHide n
+       8 -> do 
+               mkbodies2 External n
+       9 -> do 
+               mkbodies2 Function n
+       10 -> do 
+               mkbodies2 Minimize n 
+       11 -> do 
+               mkbodies2 Maximize n 
+       12 -> do 
+               mkbodies2 Consts n
+       13 -> do 
+               atom <- arbitrary 
+               bodies <- mkbodies n
+               return $ Computes atom bodies 
+       14 -> RComment <$> arbitrary
+       15 -> return Emptyset
+         
+mkbodies n = do 
+       repeat <- choose(1,n) 
+       let n' = n `div` (repeat + 1)
+       replicateM repeat (arbBody n')
+
+mkbodies2 cnst n = do 
+       repeat <- choose(1,n) 
+       let n' = n `div` (repeat + 1)
+       bds <- replicateM repeat (arbBody n')
+       return $ cnst bds 
+    
+-- This will return a randomly generated parsetree 
+mkrls seed len = 
+  unGen (arbitrary :: Gen [Rules]) (System.Random.mkStdGen seed) len
