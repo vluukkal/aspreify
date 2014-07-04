@@ -40,6 +40,8 @@ import TxtRender
 -- This should be temporary as there is some copied code from RDF render
 import RdfRender ()
 
+-- import Debug.Trace 
+
 -- An unsafe counter 
 -- mknext :: (Num a) => IO (IO a)
 mknext :: IO (IO Integer)
@@ -264,33 +266,33 @@ factitem fid ctr i accu =
                                   -- (List.foldr (++) "" (List.foldr (factbody "body" ruleid ruleid ctr (bidx,True)) [] l)) 
                                   bodylst in 
                  -- let meta = mkskeletons b bn ruleid in 
-                 let meta = "" in
+                 let maxrlctr = FactRender.getnext(ctr) in 
+                 let meta = "maxrulectr(" ++ show(ruleid) ++ "," ++ show(maxrlctr) ++ ").\n" in
                  resultstr ++ meta 
-                 -- "" 
       Deny l ->
                 let numbodies = show(List.length l) in 
                 -- let bodylst = (List.foldr (++) "" (List.foldr (factbody "body" ruleid ruleid ctr (bidx,True) ) [] l)) in 
                 let l' = List.zip l [1..toInteger(List.length(l))] in 
                 let (tmplst',ctr') = (List.foldr (factbody "body" ruleid ruleid ctr (bidx,True)) ([],0) l') in 
                 let bodylst = (List.foldr (++) "" tmplst') in 
+                let maxrlctr = FactRender.getnext(ctr) in 
+                let meta = "maxrulectr(" ++ show(ruleid) ++ "," ++ show(maxrlctr) ++ ").\n" in
                 accu ++ ctext ++ preflink ++ 
                 "constraint(" ++ show(ruleid) ++ ")." ++ "\n" ++
                 "bodycount(" ++ show(ruleid) ++ "," ++ numbodies ++  ")." ++ "\n" ++
                 -- (List.foldr (++) "" (List.foldr (factbody "body" ruleid ruleid ctr (bidx,True) ) [] l))
-                bodylst
-                -- ++ 
-                -- ""
+                bodylst ++ meta 
       Fact l -> 
                 let l' = List.zip l [1..toInteger(List.length(l))] in 
                 let (tmplst',ctr') = (List.foldr (factbody "head" ruleid ruleid ctr (bidx,False)) ([],0) l') in 
                 let bodylst = (List.foldr (++) "" tmplst') in 
                 -- let bodylst = (List.foldr (++) "" (List.foldr (factbody "head" ruleid ruleid ctr (bidx,False)) [] l)) in 
+                let maxrlctr = FactRender.getnext(ctr) in 
+                let meta = "maxrulectr(" ++ show(ruleid) ++ "," ++ show(maxrlctr) ++ ").\n" in
                 accu ++ ctext ++ preflink ++ 
                 "assert(" ++ show(ruleid) ++ ")." ++ "\n" ++
                 -- (List.foldr (++) "" (List.foldr (factbody "head" ruleid ruleid ctr (bidx,True)) [] l))
-                bodylst
-                -- ++ 
-                -- ""
+                bodylst ++ meta 
       Show _ -> accu 
       Hide _ -> accu 
       GShow _ -> accu 
@@ -499,22 +501,22 @@ factargs ruleid parentid a ctr =
         -- let (res,ids) = foldr alist ("",parentid) a in res
         -- let (res,ids) = foldl alist ("",parentid) (reverse a) in res
         -- let (res,ids) = foldl alist ("",parentid) a in res
-        let (res,ids) = List.foldl alist ("",0) a in res
+        let (res,ids,ctr') = List.foldl alist ("",0,ctr) a in res
         -- let (res,ids) = foldl alist ("",parentid) (map unatom a) in res
         -- show(a)
     where 
-      alist (accu,previd) i = 
+      alist (accu,previd,ctr') i = 
           -- let argid = (myrand())::Int in 
           -- let exprid = (myrand())::Int in 
-          let argid = FactRender.getnext(ctr) in 
-          let exprid = FactRender.getnext(ctr) in 
+          let argid = FactRender.getnext(ctr') in 
+          -- let exprid = FactRender.getnext(ctr) in 
           let new_ac = accu ++ 
                        (unfactmyexpr i ruleid argid ctr) ++ 
                        "alist(" ++ show(parentid) ++ "," ++ (show (previd+1)) ++ "," ++ show(argid) ++ ").\n" 
                        -- "nxt(" ++ show(previd) ++ "," ++ show(argid) ++ ").\n"
               in
                 -- (new_ac,argid)
-                (new_ac,(previd + 1))
+                (new_ac,(previd + 1),ctr')
 
 -- Seems to stop compilation
 -- typeargs :: Integer -> a -> IO Integer -> (IO Integer, t) -> [Body] -> [[Char]]
